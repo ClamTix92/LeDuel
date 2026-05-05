@@ -1,0 +1,154 @@
+/* Style pour le logo sur le menu d'accueil */
+.main-logo {
+    width: 300px;         /* Ajuste la taille selon tes envies */
+    height: auto;
+    margin-bottom: 20px;
+    filter: drop-shadow(0 0 15px rgba(147, 51, 234, 0.4)); /* Petite lueur violette pour rappeler le logo */
+}
+
+/* Style pour le logo qui reste pendant le jeu */
+.game-logo {
+    width: 180px;  /* Tu peux ajuster cette taille */
+    height: auto;
+    margin: 0 auto 15px auto;
+    display: block; /* Pour bien le centrer */
+}
+
+#menu-container {
+    text-align: center;
+    background-color: #16213e;
+    padding: 40px;
+    border-radius: 15px;
+    border: 3px solid #e94560;
+}
+
+.theme-btn {
+    display: block;
+    width: 100%;
+    margin: 10px 0;
+    padding: 15px;
+    font-size: 1.2rem;
+    background-color: #e94560;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.theme-btn:hover {
+    background-color: #4dd0e1;
+    transform: scale(1.05);
+}
+
+body {
+    background-color: #1a1a2e;
+    color: white;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+#game-container {
+    background-color: #16213e;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    text-align: center;
+    width: 450px;
+}
+
+h1 { color: #e94560; letter-spacing: 5px; }
+
+#display-area {
+    background: #0f3460;
+    height: 300px;
+    margin: 20px 0;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 3px solid #e94560;
+}
+
+#display-area img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain; /* Garde les proportions sans déformer */
+    border-radius: 8px;
+}
+
+#display-area img[src*="logos"] {
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+    padding: 20px; /* Donne un peu d'air au logo dans son cadre */
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 5px;
+    border: none;
+    font-size: 1.2rem;
+    text-align: center;
+    background: #e94560;
+    color: white;
+}
+
+.hint-text {
+    color: #555;
+    font-size: 0.9rem;      /* Légèrement plus petit pour ne pas prendre trop de place */
+    font-style: italic;
+    margin-bottom: 15px;    /* Un peu plus d'espace avant l'input */
+    line-height: 1.4;       /* Espace entre les deux lignes de texte */
+    font-family: inherit;
+    text-align: center;
+}
+
+#pass-btn {
+    margin-top: 10px;
+    background-color: #ff9800;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+}
+
+#pass-btn:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}
+
+#restart-btn {
+    background-color: #4dd0e1;
+    color: #1a1a2e;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: transform 0.2s;
+}
+
+#restart-btn:hover {
+    transform: scale(1.1);
+}
+
+input::placeholder { color: #f8f8f8; opacity: 0.7; }
+
+#scoreboard {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 20px;
+    font-weight: bold;
+}
+
+.player { padding: 10px; border-bottom: 2px solid #e94560; }

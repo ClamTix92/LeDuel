@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L'Arène - 1v1</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="menu-container">
+        <img src="logo_duel.png" alt="Le Duel" class="main-logo">
+        <h3>Choisissez un thème pour le duel :</h3>
+        <button class="theme-btn" onclick="chooseTheme('athletes')">🇫🇷 Athlètes Français</button>
+        <button class="theme-btn" onclick="chooseTheme('stades')">🏟️ Stades Connus</button>
+        <button class="theme-btn" onclick="chooseTheme('logos')">⚽ Logos de Clubs</button>
+    </div>
+
+    <div id="game-container" style="display: none;">
+        <img src="logo_duel.png" alt="Le Duel" class="game-logo">
+        
+        <div id="display-area">
+            </div>
+
+        <p class="hint-text">
+            Les accents ne sont pas nécessaires<br>
+            Tapez uniquement les noms de famille des sportifs !
+        </p>
+
+        <div id="input-area">
+            <input type="text" id="answer-input" placeholder="Tape ta réponse ici..." autocomplete="off">
+            <button id="pass-btn">PASSER (-3s)</button>
+        </div>
+
+        <div id="scoreboard">
+            <div class="player">Toi: <span id="my-time">45</span>s</div>
+            <div class="player">Adversaire: <span id="opponent-time">45</span>s</div>
+        </div>
+
+        <div id="game-over-screen" style="display: none;">
+            <h2 id="winner-message">VICTOIRE !</h2>
+            <p>Le temps est écoulé.</p>
+            <button id="restart-btn" onclick="location.reload()">REJOUER</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
