@@ -212,5 +212,9 @@ function getTimes() {
     return times;
 }
 
+// On récupère le port donné par Render, ou 3000 par défaut
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Serveur lancé sur le port ${PORT}`));
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Le serveur tourne sur le port ${PORT}`);
+});
