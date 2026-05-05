@@ -106,6 +106,7 @@ let activePlayerId = null;
 let gameInterval = null;
 
 io.on('connection', (socket) => {
+    io.emit('update-player-count', Object.keys(players).length);
     // On initialise le joueur avec 45 secondes
     players[socket.id] = { time: 45, score: 0 };
     console.log(`Joueur connecté : ${socket.id}`);
@@ -113,26 +114,30 @@ io.on('connection', (socket) => {
 
 
     socket.on('select-theme', (themeChoice) => {
+    const playerIds = Object.keys(players);
+
+    // VÉRIFICATION : Y a-t-il au moins 2 joueurs ?
+    if (playerIds.length < 2) {
+        // On envoie un message d'alerte uniquement à celui qui a cliqué
+        socket.emit('error-message', "En attente d'un adversaire pour commencer...");
+        return;
+    }
+
     if (!currentTheme) {
         currentTheme = themeChoice;
         currentQuestionIndex = 0;
         questions = shuffle([...allQuestions[themeChoice]]);
         
-        // --- SÉCURITÉ : On désigne le 1er joueur s'il n'est pas encore défini ---
-        if (!activePlayerId) {
-            activePlayerId = Object.keys(players)[0]; 
-        }
+        activePlayerId = playerIds[0]; 
 
         io.emit('theme-chosen', themeChoice); 
         
-        // On envoie l'info de qui commence à tout le monde
         io.emit('init-game', { 
             question: questions[currentQuestionIndex],
             times: getTimes(),
             activePlayerId: activePlayerId 
         });
 
-        // On nettoie un éventuel ancien chrono avant d'en lancer un nouveau
         clearInterval(gameInterval); 
         startTimer();
     }
@@ -179,6 +184,7 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         delete players[socket.id];
+        io.emit('update-player-count', Object.keys(players).length);
         clearInterval(gameInterval);
     });
 });

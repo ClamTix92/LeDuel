@@ -5,6 +5,14 @@ const passBtn = document.getElementById('pass-btn');
 
 // answerInput.disabled = true; // Personne ne tape avant le début officiel
 
+socket.on('error-message', (msg) => {
+    alert(msg); // Une simple alerte navigateur fera l'affaire pour commencer
+});
+
+socket.on('update-player-count', (count) => {
+    document.getElementById('player-count').innerText = `Joueurs en ligne : ${count}`;
+});
+
 function chooseTheme(theme) {
     socket.emit('select-theme', theme);
 }
