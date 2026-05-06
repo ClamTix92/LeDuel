@@ -8,7 +8,7 @@ const io = new Server(server);
 app.use(express.static(__dirname));
 
 // On va stocker toutes les parties en cours ici
-const rooms = {}; 
+const rooms = {};
 
 // Fonction pour générer un code aléatoire à 4 lettres
 function generateRoomCode() {
@@ -119,39 +119,33 @@ let currentQuestionIndex = 0;
 let gameInterval = null;
 
 io.on('connection', (socket) => {
-    io.emit('update-player-count', Object.keys(players).length);
-    // On initialise le joueur avec 45 secondes
-    players[socket.id] = { time: 45, score: 0 };
     console.log(`Joueur connecté : ${socket.id}`);
-    console.log("Nouveau joueur : " + socket.id); // Modifie la connexion pour gérer le choix du thème
 
-    // --- CRÉER UNE PARTIE ---
+    // --- 1. CRÉER UNE PARTIE ---
     socket.on('create-room', () => {
         const code = generateRoomCode();
-        socket.join(code); // Le joueur rejoint "sa" room
-        
+        socket.join(code);
+
         rooms[code] = {
             host: socket.id,
             players: [socket.id],
-            settings: { theme: 'athletes', timer: 45 }
+            settings: { theme: 'athletes', timer: 45 },
+            gameState: {} // On stockera les infos de la partie ici
         };
 
         socket.emit('room-created', code);
     });
 
-    // --- REJOINDRE UNE PARTIE ---
+    // --- 2. REJOINDRE UNE PARTIE ---
     socket.on('join-room', (code) => {
         code = code.toUpperCase();
-        
+
         if (rooms[code]) {
             if (rooms[code].players.length < 2) {
                 socket.join(code);
                 rooms[code].players.push(socket.id);
-                
-                // On prévient l'invité qu'il est rentré
+
                 socket.emit('room-joined', code);
-                
-                // On prévient tout le monde dans la room qu'ils sont 2
                 io.to(code).emit('room-update', rooms[code].players.length);
             } else {
                 socket.emit('error-message', "Cette partie est déjà pleine !");
@@ -160,111 +154,148 @@ io.on('connection', (socket) => {
             socket.emit('error-message', "Code invalide ou partie introuvable.");
         }
     });
-    
-    socket.on('select-theme', (themeChoice) => {
-    const playerIds = Object.keys(players);
 
-    // VÉRIFICATION : Y a-t-il au moins 2 joueurs ?
-    if (playerIds.length < 2) {
-        // On envoie un message d'alerte uniquement à celui qui a cliqué
-        socket.emit('error-message', "En attente d'un adversaire pour commencer...");
-        return;
+    // --- 3. LANCER LA PARTIE DEPUIS LE LOBBY ---
+    socket.on('start-custom-game', (data) => {
+        const room = rooms[data.code];
+
+        // On s'assure que c'est bien l'hôte qui lance la partie
+        if (room && room.host === socket.id) {
+            room.settings.theme = data.theme;
+            room.settings.timer = data.timer;
+
+            // On prépare le jeu spécifique à cette Room
+            room.gameState = {
+                questions: shuffle([...allQuestions[data.theme]]),
+                currentQuestionIndex: 0,
+                activePlayerId: room.players[0], // L'hôte commence
+                times: {}
+            };
+
+            // On attribue le temps choisi aux deux joueurs
+            room.players.forEach(pId => {
+                room.gameState.times[pId] = data.timer;
+            });
+
+            // On prévient les deux joueurs que la partie démarre
+            io.to(data.code).emit('init-game', {
+                theme: data.theme,
+                question: room.gameState.questions[0],
+                times: room.gameState.times,
+                activePlayerId: room.gameState.activePlayerId
+            });
+
+            // --- LANCEMENT DU CHRONO DE LA ROOM ---
+            room.gameState.timerInterval = setInterval(() => {
+                const activeId = room.gameState.activePlayerId;
+                
+                if (activeId && room.gameState.times[activeId] > 0) {
+                    room.gameState.times[activeId] -= 1;
+
+                    // Si le temps est écoulé
+                    if (room.gameState.times[activeId] <= 0) {
+                        clearInterval(room.gameState.timerInterval);
+                        const winnerId = room.players.find(id => id !== activeId);
+                        io.to(data.code).emit('game-over', { winnerId: winnerId });
+                    } else {
+                        // Mise à jour de l'affichage
+                        io.to(data.code).emit('timer-update', room.gameState.times);
+                    }
+                }
+            }, 1000);
+
+        }
+    });
+
+    // Petite fonction pour trouver la room d'un joueur
+    function getPlayerRoom(socketId) {
+        for (const code in rooms) {
+            if (rooms[code].players.includes(socketId)) return code;
+        }
+        return null;
     }
 
-    if (!currentTheme) {
-        currentTheme = themeChoice;
-        currentQuestionIndex = 0;
-        questions = shuffle([...allQuestions[themeChoice]]);
-        
-        activePlayerId = playerIds[0]; 
-
-        io.emit('theme-chosen', themeChoice); 
-        
-        io.emit('init-game', { 
-            question: questions[currentQuestionIndex],
-            times: getTimes(),
-            activePlayerId: activePlayerId 
-        });
-
-        clearInterval(gameInterval); 
-        startTimer();
-    }
-});
-
-    socket.on('pass-question', () => {
-    // On vérifie que c'est bien le tour du joueur qui demande
-    if (socket.id !== activePlayerId) return;
-
-    // Appliquer la pénalité
-    players[socket.id].time -= 3;
-    if (players[socket.id].time < 0) players[socket.id].time = 0;
-
-    // Passer à la question suivante
-    currentQuestionIndex++;
-
-    // Prévenir tout le monde du changement
-    io.emit('next-round', {
-        nextQuestion: questions[currentQuestionIndex],
-        activePlayerId: activePlayerId, // Le tour ne change pas !
-        times: getTimes()
-    });
-    });
-
+    // --- 3.1 RÉPONDRE À UNE QUESTION ---
     socket.on('submit-answer', (guess) => {
-        // Seul le joueur actif peut répondre
-        if (socket.id !== activePlayerId) return;
+        const code = getPlayerRoom(socket.id);
+        if (!code) return;
+        
+        const room = rooms[code];
+        const state = room.gameState;
 
-        const correct = questions[currentQuestionIndex].answer;
+        // On vérifie que c'est bien son tour
+        if (state.activePlayerId !== socket.id) return;
+        if (state.activePlayerId !== socket.id || state.isPassing) return;
+
+        const correct = state.questions[state.currentQuestionIndex].answer;
+        
         if (normalize(guess) === normalize(correct)) {
-            currentQuestionIndex++;
+            state.currentQuestionIndex++;
             
-            // Changement de tour : l'autre joueur devient actif
-            const playerIds = Object.keys(players);
-            activePlayerId = playerIds.find(id => id !== socket.id);
+            // Changement de joueur
+            state.activePlayerId = room.players.find(id => id !== socket.id);
 
-            io.emit('next-round', {
-                nextQuestion: questions[currentQuestionIndex],
-                activePlayerId: activePlayerId,
-                times: getTimes()
+            io.to(code).emit('next-round', {
+                nextQuestion: state.questions[state.currentQuestionIndex],
+                activePlayerId: state.activePlayerId,
+                times: state.times
             });
         }
     });
 
+    // --- 3.2 PASSER LA QUESTION ---
+    socket.on('pass-question', () => {
+        const code = getPlayerRoom(socket.id);
+        if (!code) return;
+        
+        const room = rooms[code];
+        const state = room.gameState;
+
+        // Sécurité : si ce n'est pas son tour ou s'il est déjà en train de passer, on bloque
+        if (state.activePlayerId !== socket.id) return;
+        if (state.isPassing) return; 
+
+        // 1. On verrouille les réponses côté serveur
+        state.isPassing = true;
+
+        // 2. On attend 3 secondes AVANT de changer la question
+        setTimeout(() => {
+            // On vérifie que la partie n'est pas terminée (temps écoulé) pendant l'attente
+            if (state.times && state.times[socket.id] > 0) {
+                state.currentQuestionIndex++;
+                state.isPassing = false; // On déverrouille
+
+                // 3. On envoie enfin la nouvelle image !
+                io.to(code).emit('next-round', {
+                    nextQuestion: state.questions[state.currentQuestionIndex],
+                    activePlayerId: state.activePlayerId,
+                    times: state.times
+                });
+            }
+        }, 3000);
+    });
+
+    // --- 4. DÉCONNEXION ---
     socket.on('disconnect', () => {
-        delete players[socket.id];
-        io.emit('update-player-count', Object.keys(players).length);
-        clearInterval(gameInterval);
+        for (const code in rooms) {
+            const room = rooms[code];
+            const index = room.players.indexOf(socket.id);
+
+            if (index !== -1) {
+                room.players.splice(index, 1);
+                io.to(code).emit('room-update', room.players.length);
+
+                if (room.players.length === 0) {
+                    delete rooms[code];
+                }
+                break;
+            }
+            if (room.gameState && room.gameState.timerInterval)
+            clearInterval(room.gameState.timerInterval);
+        }
+        console.log(`Joueur déconnecté : ${socket.id}`);
     });
 });
-
-function startTimer() {
-    gameInterval = setInterval(() => {
-        if (activePlayerId && players[activePlayerId]) {
-            players[activePlayerId].time -= 1;
-            
-            if (players[activePlayerId].time <= 0) {
-                players[activePlayerId].time = 0;
-
-                currentQuestionIndex = 0;
-                shuffle(questions);
-    
-                // On cherche l'ID du gagnant (celui qui n'est pas le joueur actif)
-                const winnerId = Object.keys(players).find(id => id !== activePlayerId);
-    
-                io.emit('game-over', { winnerId: winnerId });
-                clearInterval(gameInterval);
-}
-
-            io.emit('timer-update', getTimes());
-        }
-    }, 1000);
-}
-
-function getTimes() {
-    let times = {};
-    for (let id in players) { times[id] = players[id].time; }
-    return times;
-}
 
 // On récupère le port donné par Render, ou 3000 par défaut
 const PORT = process.env.PORT || 3000;

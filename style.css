@@ -14,6 +14,72 @@
     display: block; /* Pour bien le centrer */
 }
 
+.menu-box {
+    background: #1a1a2e;
+    padding: 30px;
+    border-radius: 15px;
+    border: 2px solid #e94560;
+    text-align: center;
+    max-width: 400px;
+    margin: 50px auto;
+}
+
+.action-buttons button {
+    display: block;
+    width: 100%;
+    margin: 10px 0;
+    padding: 15px;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+/* Bouton principal (Créer) */
+#btn-create-room {
+    background: linear-gradient(135deg, #e94560, #ff0055);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+    transition: all 0.2s ease;
+}
+
+#btn-create-room:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(233, 69, 96, 0.6);
+}
+
+.join-box {
+    margin-top: 25px;
+    display: flex;
+    gap: 0; /* On colle l'input et le bouton */
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid #0f3460;
+}
+
+#input-room-code {
+    flex-grow: 1; /* Prend l'espace restant */
+    border-radius: 0;
+    border: none;
+    background: rgba(15, 52, 96, 0.5);
+    color: white;
+    font-size: 1.2rem;
+}
+
+#btn-join-room:hover {
+    background-color: #4dd0e1;
+    color: #1a1a2e;
+}
+
+.highlight {
+    color: #e94560;
+    font-size: 2rem;
+    letter-spacing: 5px;
+}
+
 #menu-container {
     text-align: center;
     background-color: #16213e;
@@ -39,6 +105,28 @@
 .theme-btn:hover {
     background-color: #4dd0e1;
     transform: scale(1.05);
+}
+
+/* Paramètres du Lobby */
+select {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0 20px 0;
+    background-color: #0f3460;
+    color: white;
+    border: 1px solid #4dd0e1;
+    border-radius: 5px;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+#btn-start-custom {
+    background-color: #555; /* Gris par défaut (désactivé) */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: 0.3s;
 }
 
 body {
@@ -108,21 +196,50 @@ input {
     text-align: center;
 }
 
+/* Amélioration du bouton Passer */
 #pass-btn {
     margin-top: 10px;
-    background-color: #ff9800;
+    background: linear-gradient(135deg, #ff9800, #f44336);
     color: white;
     border: none;
-    padding: 8px 20px;
-    border-radius: 5px;
+    padding: 12px;
+    border-radius: 8px;
     cursor: pointer;
     font-weight: bold;
-    width: 100%;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 10px rgba(255, 152, 0, 0.3);
+}
+
+#pass-btn:hover:not(:disabled) {
+    transform: scale(1.02);
+    box-shadow: 0 6px 15px rgba(255, 152, 0, 0.5);
 }
 
 #pass-btn:disabled {
-    background-color: #555;
+    background: #444;
     cursor: not-allowed;
+    box-shadow: none;
+    opacity: 0.6;
+}
+
+/* L'input de réponse plus "Gaming" */
+#answer-input {
+    width: 100%;
+    padding: 15px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    font-size: 1.2rem;
+    text-align: center;
+    background: #0f3460;
+    color: white;
+    transition: border-color 0.3s;
+}
+
+#answer-input:focus {
+    outline: none;
+    border-color: #e94560;
+    box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
 }
 
 #restart-btn {
@@ -140,6 +257,22 @@ input {
 
 #restart-btn:hover {
     transform: scale(1.1);
+}
+
+/* Message de victoire/défaite */
+#game-over-screen {
+    padding: 40px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#winner-message {
+    font-size: 3rem;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    text-shadow: 0 0 20px currentColor;
 }
 
 input::placeholder { color: #f8f8f8; opacity: 0.7; }

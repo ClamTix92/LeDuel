@@ -55,6 +55,18 @@ socket.on('room-update', (playerCount) => {
     }
 });
 
+// --- BOUTON LANCER LE DUEL (HÔTE) ---
+document.getElementById('btn-start-custom').addEventListener('click', () => {
+    const theme = document.getElementById('select-theme').value;
+    const timer = document.getElementById('select-timer').value;
+    
+    socket.emit('start-custom-game', { 
+        code: myRoomCode, 
+        theme: theme, 
+        timer: parseInt(timer) 
+    });
+});
+
 socket.on('error-message', (msg) => {
     alert(msg); // Une simple alerte navigateur fera l'affaire pour commencer
 });
@@ -63,29 +75,21 @@ socket.on('update-player-count', (count) => {
     document.getElementById('player-count').innerText = `Joueurs en ligne : ${count}`;
 });
 
-function chooseTheme(theme) {
-    socket.emit('select-theme', theme);
-}
-
-socket.on('theme-chosen', (theme) => {
-    document.getElementById('menu-container').style.display = "none";
+socket.on('init-game', (data) => {
+    // On cache le lobby et on affiche le jeu
+    document.getElementById('lobby-container').style.display = "none";
     document.getElementById('game-container').style.display = "block";
-
+    
+    // Mise à jour de l'indice selon le thème choisi
     const hint = document.querySelector('.hint-text');
-    if (theme === 'athletes') {
+    if (data.theme === 'athletes') {
         hint.innerHTML = "Les accents ne sont pas nécessaires<br>Tapez uniquement les noms de famille !";
-    } else if (theme === 'stades') {
+    } else if (data.theme === 'stades') {
         hint.innerHTML = "Les accents ne sont pas nécessaires<br>Le nom le plus populaire est attendu.";
     } else {
         hint.innerHTML = "Les accents ne sont pas nécessaires<br>Seulement le nom de la ville du club est attendu.";
     }
-});
 
-
-socket.on('init-game', (data) => {
-    document.getElementById('menu-container').style.display = "none";
-    document.getElementById('game-container').style.display = "block";
-    
     if (data.question) {
         displayArea.innerHTML = `<img src="${data.question.image}" style="max-width:100%; border-radius:10px;">`;
     }
@@ -125,14 +129,28 @@ socket.on('next-round', (data) => {
     }
 
     if (data.activePlayerId === socket.id) {
-        answerInput.style.backgroundColor = "#e94560"; 
+        // Nettoyage de l'animation pour un retour au rouge standard
+        answerInput.style.background = ""; 
+        answerInput.style.backgroundSize = "";
+        answerInput.style.backgroundPosition = "";
+        answerInput.style.transition = "border-color 0.3s";
+        answerInput.style.backgroundColor = "#e94560";
+        answerInput.placeholder = "Tape ta réponse ici...";
+        
         answerInput.disabled = false;
         answerInput.focus();
+        
+        // On réactive le bouton Passer
         passBtn.disabled = false;
         passBtn.style.opacity = "1";
     } else {
+        // Tour de l'adversaire
+        answerInput.style.background = "";
         answerInput.style.backgroundColor = "#555"; 
+        answerInput.placeholder = "Au tour de l'adversaire...";
         answerInput.disabled = true;
+        
+        // On grise le bouton Passer
         passBtn.disabled = true;
         passBtn.style.opacity = "0.5";
     }
@@ -140,23 +158,44 @@ socket.on('next-round', (data) => {
 
 
 passBtn.addEventListener('click', () => {
+    // 1. On bloque immédiatement l'input et le bouton
+    answerInput.disabled = true;
+    passBtn.disabled = true;
+    answerInput.value = "";
+    answerInput.placeholder = "PÉNALITÉ EN COURS...";
+
+    // 2. Animation Magique : Gris vers Rouge de droite à gauche
+    answerInput.style.transition = "none";
+    // On crée un fond 50% gris à gauche, 50% rouge à droite
+    answerInput.style.background = "linear-gradient(to right, #555 50%, #e94560 50%)";
+    answerInput.style.backgroundSize = "200% 100%";
+    answerInput.style.backgroundPosition = "0% 0"; // On commence sur la partie grise
+
+    // Petite astuce pour forcer le navigateur à comprendre le point de départ
+    void answerInput.offsetWidth;
+
+    // On lance le défilement pendant 3 secondes
+    answerInput.style.transition = "background-position 3s linear";
+    answerInput.style.backgroundPosition = "100% 0"; // On glisse vers la partie rouge
+
+    // 3. On informe le serveur (qui va attendre 3s avant d'envoyer la suite)
     socket.emit('pass-question');
 });
 
 
 
 socket.on('game-over', (data) => {
-    // 1. On cache la zone de jeu
+    // 1. On cache TOUTE la zone de jeu proprement
     displayArea.style.display = "none";
     document.querySelector('.hint-text').style.display = "none";
-    answerInput.style.display = "none";
-    
+    document.getElementById('input-area').style.display = "none"; // <--- On cache tout le bloc (input + bouton pass)
+    document.getElementById('scoreboard').style.display = "none"; // Optionnel : cacher aussi les scores
+
     // 2. On affiche l'écran de fin
     const screen = document.getElementById('game-over-screen');
     const msg = document.getElementById('winner-message');
     screen.style.display = "block";
 
-    // 3. On personnalise le message
     if (data.winnerId === socket.id) {
         msg.innerText = "VICTOIRE ! 🏆";
         msg.style.color = "#4dd0e1";
