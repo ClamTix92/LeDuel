@@ -8,14 +8,45 @@
 </head>
 <body>
 
-    <div id="menu-container">
-        <img src="logo_duel.png" alt="Le Duel" class="main-logo">
-        <p id="player-count">Joueurs en ligne : 0</p>
-        <h3>Choisissez un thème pour le duel :</h3>
-        <button class="theme-btn" onclick="chooseTheme('athletes')">🇫🇷 Athlètes Français</button>
-        <button class="theme-btn" onclick="chooseTheme('stades')">🏟️ Stades Connus</button>
-        <button class="theme-btn" onclick="chooseTheme('logos')">⚽ Logos de Clubs</button>
+    <div id="home-container" class="menu-box">
+    <img src="logo-duel.png" alt="Le Duel" class="main-logo">
+    <div class="action-buttons">
+        <button id="btn-create-room">CRÉER UNE PARTIE PRIVÉE</button>
+        <div class="join-box">
+            <input type="text" id="input-room-code" placeholder="Code de la partie" maxlength="4">
+            <button id="btn-join-room">REJOINDRE</button>
+        </div>
     </div>
+</div>
+
+<div id="lobby-container" class="menu-box" style="display: none;">
+    <img src="logo-duel.png" alt="Le Duel" class="game-logo">
+    <h2>Code de la partie : <span id="display-room-code" class="highlight">----</span></h2>
+    <p>Joueurs dans le salon : <span id="room-player-count">1</span>/2</p>
+
+    <div id="host-settings">
+        <h3>Paramètres de la partie</h3>
+        <label>Thème :</label>
+        <select id="select-theme">
+            <option value="athletes">Athlètes Français</option>
+            <option value="stades">Stades de Foot</option>
+            <option value="logos">Logos de Clubs</option>
+        </select>
+
+        <label>Temps par joueur :</label>
+        <select id="select-timer">
+            <option value="30">30 secondes (Rapide)</option>
+            <option value="45" selected>45 secondes (Classique)</option>
+            <option value="60">60 secondes (Long)</option>
+        </select>
+
+        <button id="btn-start-custom" disabled>LANCER LE DUEL (Attente du joueur 2...)</button>
+    </div>
+
+    <div id="guest-waiting" style="display: none;">
+        <p>En attente que l'hôte configure et lance la partie...</p>
+    </div>
+</div>
 
     <div id="game-container" style="display: none;">
         <img src="logo_duel.png" alt="Le Duel" class="game-logo">

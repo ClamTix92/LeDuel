@@ -5,6 +5,56 @@ const passBtn = document.getElementById('pass-btn');
 
 // answerInput.disabled = true; // Personne ne tape avant le début officiel
 
+// Au début de script.js, on garde en mémoire le code de notre partie
+let myRoomCode = null;
+
+// --- BOUTONS D'ACCUEIL ---
+document.getElementById('btn-create-room').addEventListener('click', () => {
+    socket.emit('create-room');
+});
+
+document.getElementById('btn-join-room').addEventListener('click', () => {
+    const code = document.getElementById('input-room-code').value;
+    if (code.length > 0) socket.emit('join-room', code);
+});
+
+// --- RETOURS DU SERVEUR ---
+socket.on('room-created', (code) => {
+    myRoomCode = code;
+    document.getElementById('home-container').style.display = 'none';
+    document.getElementById('lobby-container').style.display = 'block';
+    document.getElementById('display-room-code').innerText = code;
+    
+    // L'hôte voit les paramètres
+    document.getElementById('host-settings').style.display = 'block';
+    document.getElementById('guest-waiting').style.display = 'none';
+});
+
+socket.on('room-joined', (code) => {
+    myRoomCode = code;
+    document.getElementById('home-container').style.display = 'none';
+    document.getElementById('lobby-container').style.display = 'block';
+    document.getElementById('display-room-code').innerText = code;
+    
+    // L'invité voit l'écran d'attente
+    document.getElementById('host-settings').style.display = 'none';
+    document.getElementById('guest-waiting').style.display = 'block';
+});
+
+socket.on('room-update', (playerCount) => {
+    document.getElementById('room-player-count').innerText = playerCount;
+    
+    // Si la room est pleine, l'hôte peut lancer
+    if (playerCount === 2) {
+        const startBtn = document.getElementById('btn-start-custom');
+        if(startBtn) {
+            startBtn.disabled = false;
+            startBtn.innerText = "LANCER LE DUEL !";
+            startBtn.style.backgroundColor = "#28a745"; // Petit effet vert
+        }
+    }
+});
+
 socket.on('error-message', (msg) => {
     alert(msg); // Une simple alerte navigateur fera l'affaire pour commencer
 });

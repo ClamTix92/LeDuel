@@ -7,6 +7,19 @@ const io = new Server(server);
 
 app.use(express.static(__dirname));
 
+// On va stocker toutes les parties en cours ici
+const rooms = {}; 
+
+// Fonction pour générer un code aléatoire à 4 lettres
+function generateRoomCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -99,10 +112,10 @@ const allQuestions = {
 // On mélange les questions dès que le serveur s'allume
 shuffle(questions);
 
-let currentTheme = null;
+// let currentTheme = null;
 let currentQuestionIndex = 0;
-let players = {}; // Pour stocker les infos des joueurs
-let activePlayerId = null;
+// let players = {}; // Pour stocker les infos des joueurs
+// let activePlayerId = null;
 let gameInterval = null;
 
 io.on('connection', (socket) => {
@@ -112,7 +125,42 @@ io.on('connection', (socket) => {
     console.log(`Joueur connecté : ${socket.id}`);
     console.log("Nouveau joueur : " + socket.id); // Modifie la connexion pour gérer le choix du thème
 
+    // --- CRÉER UNE PARTIE ---
+    socket.on('create-room', () => {
+        const code = generateRoomCode();
+        socket.join(code); // Le joueur rejoint "sa" room
+        
+        rooms[code] = {
+            host: socket.id,
+            players: [socket.id],
+            settings: { theme: 'athletes', timer: 45 }
+        };
 
+        socket.emit('room-created', code);
+    });
+
+    // --- REJOINDRE UNE PARTIE ---
+    socket.on('join-room', (code) => {
+        code = code.toUpperCase();
+        
+        if (rooms[code]) {
+            if (rooms[code].players.length < 2) {
+                socket.join(code);
+                rooms[code].players.push(socket.id);
+                
+                // On prévient l'invité qu'il est rentré
+                socket.emit('room-joined', code);
+                
+                // On prévient tout le monde dans la room qu'ils sont 2
+                io.to(code).emit('room-update', rooms[code].players.length);
+            } else {
+                socket.emit('error-message', "Cette partie est déjà pleine !");
+            }
+        } else {
+            socket.emit('error-message', "Code invalide ou partie introuvable.");
+        }
+    });
+    
     socket.on('select-theme', (themeChoice) => {
     const playerIds = Object.keys(players);
 
