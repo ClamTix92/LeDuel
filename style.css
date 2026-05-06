@@ -33,6 +33,81 @@
     cursor: pointer;
 }
 
+/* On groupe les deux boutons pour qu'ils aient exactement le même design */
+#btn-matchmaking, #btn-create-room {
+    background: linear-gradient(135deg, #e94560, #9333ea);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 15px;
+    width: 100%;
+}
+
+/* On ajoute juste une petite marge sous le bouton Matchmaking pour l'espacer du suivant */
+#btn-matchmaking {
+    margin-bottom: 15px;
+}
+
+/* Effet au survol identique pour les deux */
+#btn-matchmaking:hover, #btn-create-room:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(233, 69, 96, 0.4);
+}
+
+/* Effet quand on clique */
+#btn-matchmaking:active, #btn-create-room:active {
+    transform: translateY(0);
+}
+
+/* Écran VS */
+.vs-layout {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 30px 0;
+}
+
+.player-card {
+    width: 40%;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    border: 1px solid #c89b3c;
+}
+
+.vs-middle {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #c89b3c;
+    font-style: italic;
+}
+
+.badge {
+    font-size: 0.7rem;
+    background: #c89b3c;
+    color: #1a1a2e;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+/* Animation de chargement */
+.loader {
+    border: 4px solid #0f3460;
+    border-top: 4px solid #0ac8b9;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
 /* Bouton principal (Créer) */
 #btn-create-room {
     background: linear-gradient(135deg, #e94560, #ff0055);

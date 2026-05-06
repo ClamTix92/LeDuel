@@ -1,58 +1,103 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>L'Arène - 1v1</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
     <div id="home-container" class="menu-box">
-    <img src="logo_duel.png" alt="Le Duel" class="main-logo">
-    <div class="action-buttons">
-        <button id="btn-create-room">CRÉER UNE PARTIE PRIVÉE</button>
-        <div class="join-box">
-            <input type="text" id="input-room-code" placeholder="Code de la partie" maxlength="4">
-            <button id="btn-join-room">REJOINDRE</button>
+        <img src="logo_duel.png" alt="Le Duel" class="main-logo">
+        <div class="action-buttons">
+            <button id="btn-matchmaking">JOUER (MATCHMAKING)</button>
+
+            <button id="btn-create-room">CRÉER UNE PARTIE PRIVÉE</button>
+            <div class="join-box">
+                <input type="text" id="input-room-code" placeholder="Code de la partie" maxlength="4">
+                <button id="btn-join-room">REJOINDRE</button>
+            </div>
         </div>
     </div>
-</div>
 
-<div id="lobby-container" class="menu-box" style="display: none;">
-    <img src="logo_duel.png" alt="Le Duel" class="game-logo">
-    <h2>Code de la partie : <span id="display-room-code" class="highlight">----</span></h2>
-    <p>Joueurs dans le salon : <span id="room-player-count">1</span>/2</p>
+    <div id="lobby-container" class="menu-box" style="display: none;">
+        <img src="logo_duel.png" alt="Le Duel" class="game-logo">
+        <h2>Code de la partie : <span id="display-room-code" class="highlight">----</span></h2>
+        <p>Joueurs dans le salon : <span id="room-player-count">1</span>/2</p>
 
-    <div id="host-settings">
-        <h3>Paramètres de la partie</h3>
-        <label>Thème :</label>
-        <select id="select-theme">
-            <option value="athletes">Athlètes Français</option>
-            <option value="stades">Stades de Foot</option>
-            <option value="logos">Logos de Clubs</option>
-        </select>
+        <div id="host-settings">
+            <h3>Paramètres de la partie</h3>
+            <label>Thème :</label>
+            <select id="select-theme">
+                <option value="athletes">Athlètes Français</option>
+                <option value="stades">Stades de Foot</option>
+                <option value="logos_clubs_foot">Logos de Clubs</option>
+                <option value="logos_rugby">Logos Rugby</option>
+                <option value="logos_nba">Logos NBA</option>
+                <option value="logos_nfl">Logos NFL</option>
+                <option value="voitures">Marques de voitures</option>
+                <option value="politique_fr">Politiques Français</option>
+                <option value="hommes_etat">Hommes/Femmes d'État</option>
+                <option value="drapeaux">Drapeaux (Pays)</option>
+                <option value="capitales">Capitales (Pays)</option>
+                <option value="formes_pays">Forme des pays</option>
+                <option value="acteurs">Acteurs</option>
+                <option value="actrices">Actrices</option>
+                <option value="realisateurs">Réalisateurs</option>
+                <option value="realisatrices">Réalisatrices</option>
+            </select>
 
-        <label>Temps par joueur :</label>
-        <select id="select-timer">
-            <option value="30">30 secondes (Rapide)</option>
-            <option value="45" selected>45 secondes (Classique)</option>
-            <option value="60">60 secondes (Long)</option>
-        </select>
+            <label>Temps par joueur :</label>
+            <select id="select-timer">
+                <option value="30">30 secondes (Rapide)</option>
+                <option value="45" selected>45 secondes (Classique)</option>
+                <option value="60">60 secondes (Long)</option>
+            </select>
 
-        <button id="btn-start-custom" disabled>LANCER LE DUEL (Attente du joueur 2...)</button>
+            <button id="btn-start-custom" disabled>LANCER LE DUEL (Attente du joueur 2...)</button>
+        </div>
+
+        <div id="guest-waiting" style="display: none;">
+            <p>En attente que l'hôte configure et lance la partie...</p>
+        </div>
     </div>
 
-    <div id="guest-waiting" style="display: none;">
-        <p>En attente que l'hôte configure et lance la partie...</p>
+    <div id="matchmaking-container" class="menu-box" style="display: none;">
+        <div id="queue-status">
+            <div class="loader"></div>
+            <h2>Recherche d'un adversaire...</h2>
+            <p>Elo estimé : <span id="my-elo-display">1000</span></p>
+        </div>
+
+        <div id="vs-screen" style="display: none;">
+            <div class="vs-layout">
+                <div class="player-card left">
+                    <div class="avatar">👤</div>
+                    <h3 id="p1-name">Joueur 1</h3>
+                    <span class="badge">COMMENCE</span>
+                </div>
+                <div class="vs-middle">VS</div>
+                <div class="player-card right">
+                    <div class="avatar">👤</div>
+                    <h3 id="p2-name">Joueur 2</h3>
+                    <span class="badge">RÉPOND</span>
+                </div>
+            </div>
+            <div class="match-info">
+                <p>Thème : <span id="match-theme" class="highlight">---</span></p>
+                <h1 id="match-countdown">3</h1>
+            </div>
+        </div>
     </div>
-</div>
 
     <div id="game-container" style="display: none;">
         <img src="logo_duel.png" alt="Le Duel" class="game-logo">
-        
+
         <div id="display-area">
-            </div>
+        </div>
 
         <p class="hint-text">
             Les accents ne sont pas nécessaires<br>
@@ -79,4 +124,5 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
 </body>
+
 </html>

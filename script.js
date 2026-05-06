@@ -18,6 +18,39 @@ document.getElementById('btn-join-room').addEventListener('click', () => {
     if (code.length > 0) socket.emit('join-room', code);
 });
 
+document.getElementById('btn-matchmaking').addEventListener('click', () => {
+    document.getElementById('home-container').style.display = 'none';
+    document.getElementById('matchmaking-container').style.display = 'block';
+    socket.emit('join-matchmaking');
+});
+
+socket.on('match-found', (data) => {
+    myRoomCode = data.roomCode;
+    document.getElementById('queue-status').style.display = 'none';
+    document.getElementById('vs-screen').style.display = 'block';
+    
+    // Remplir les infos
+    document.getElementById('p1-name').innerText = data.p1Name;
+    document.getElementById('p2-name').innerText = data.p2Name;
+    document.getElementById('match-theme').innerText = data.theme.toUpperCase();
+
+    // Lancer le décompte de 3 secondes
+    let count = 3;
+    const countEl = document.getElementById('match-countdown');
+    const timer = setInterval(() => {
+        count--;
+        countEl.innerText = count;
+        if (count <= 0) {
+            clearInterval(timer);
+            // On réutilise la logique d'init-game existante
+            // Le serveur doit envoyer init-game après les 3s
+            if (data.activePlayerId === socket.id) {
+                socket.emit('matchmaking-ready', { code: myRoomCode });
+            }
+        }
+    }, 1000);
+});
+
 // --- RETOURS DU SERVEUR ---
 socket.on('room-created', (code) => {
     myRoomCode = code;
@@ -60,7 +93,7 @@ document.getElementById('btn-start-custom').addEventListener('click', () => {
     const theme = document.getElementById('select-theme').value;
     const timer = document.getElementById('select-timer').value;
     
-    socket.emit('start-custom-game', { 
+    socket.emit('start-game', { 
         code: myRoomCode, 
         theme: theme, 
         timer: parseInt(timer) 
@@ -77,18 +110,29 @@ socket.on('update-player-count', (count) => {
 
 socket.on('init-game', (data) => {
     // On cache le lobby et on affiche le jeu
+    document.getElementById('matchmaking-container').style.display = 'none';
     document.getElementById('lobby-container').style.display = "none";
     document.getElementById('game-container').style.display = "block";
     
-    // Mise à jour de l'indice selon le thème choisi
+    // --- DICTIONNAIRE DES INDICES PAR THÈME ---
+    const hintMessages = {
+        athletes: "Les accents ne sont pas nécessaires<br>Tapez uniquement les noms de famille !",
+        stades: "Les accents ne sont pas nécessaires<br>Le nom le plus populaire est attendu.",
+        logos_clubs_foot: "Les accents ne sont pas nécessaires<br>Seulement le nom de la ville du club est attendu.",
+        logos_rugby: "Les accents ne sont pas nécessaires<br>Seulement le nom de la ville ou du club est attendu.",
+        logos_nba: "Les accents ne sont pas nécessaires<br>Seulement le nom de la franchise est attendu, pas celui de la ville.",
+        logos_nfl: "Les accents ne sont pas nécessaires<br>Seulement le nom de la franchise est attendu, pas celui de la ville.",
+        drapeaux: "Les accents ne sont pas nécessaires", // Sans la phrase supplémentaire
+        // Tu peux ajouter tous les autres thèmes ici au fur et à mesure !
+        // capitales: "...",
+        // acteurs: "..."
+    };
+
+    // Mise à jour de l'indice
     const hint = document.querySelector('.hint-text');
-    if (data.theme === 'athletes') {
-        hint.innerHTML = "Les accents ne sont pas nécessaires<br>Tapez uniquement les noms de famille !";
-    } else if (data.theme === 'stades') {
-        hint.innerHTML = "Les accents ne sont pas nécessaires<br>Le nom le plus populaire est attendu.";
-    } else {
-        hint.innerHTML = "Les accents ne sont pas nécessaires<br>Seulement le nom de la ville du club est attendu.";
-    }
+    // On cherche si un message spécifique existe pour le thème choisi.
+    // Sinon (grâce à ||), on affiche un message par défaut.
+    hint.innerHTML = hintMessages[data.theme] || "Les accents ne sont pas nécessaires";
 
     if (data.question) {
         displayArea.innerHTML = `<img src="${data.question.image}" style="max-width:100%; border-radius:10px;">`;
