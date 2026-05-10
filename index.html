@@ -1,128 +1,247 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>L'Arène - 1v1</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Le Duel</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-
-    <div id="home-container" class="menu-box">
-        <img src="logo_duel.png" alt="Le Duel" class="main-logo">
-        <div class="action-buttons">
-            <button id="btn-matchmaking">JOUER (MATCHMAKING)</button>
-
-            <button id="btn-create-room">CRÉER UNE PARTIE PRIVÉE</button>
-            <div class="join-box">
-                <input type="text" id="input-room-code" placeholder="Code de la partie" maxlength="4">
-                <button id="btn-join-room">REJOINDRE</button>
-            </div>
-        </div>
+  <!-- ÉCRAN 1 : SÉLECTION DU MODE -->
+  <div id="mode-select-container">
+    <div class="mode-logo-wrap">
+      <img src="logo_duel.png" alt="Le Duel" class="mode-logo">
     </div>
 
-    <div id="lobby-container" class="menu-box" style="display: none;">
-        <img src="logo_duel.png" alt="Le Duel" class="game-logo">
-        <h2>Code de la partie : <span id="display-room-code" class="highlight">----</span></h2>
-        <p>Joueurs dans le salon : <span id="room-player-count">1</span>/2</p>
+    <p class="mode-subtitle">Choisis ton mode de jeu</p>
 
-        <div id="host-settings">
-            <h3>Paramètres de la partie</h3>
-            <label>Thème :</label>
-            <select id="select-theme">
-                <option value="athletes">Athlètes Français</option>
-                <option value="stades">Stades de Foot</option>
-                <option value="logos_clubs_foot">Logos de Clubs</option>
-                <option value="logos_rugby">Logos Rugby</option>
-                <option value="logos_nba">Logos NBA</option>
-                <option value="logos_nfl">Logos NFL</option>
-                <option value="voitures">Marques de voitures</option>
-                <option value="politique_fr">Politiques Français</option>
-                <option value="hommes_etat">Hommes/Femmes d'État</option>
-                <option value="drapeaux">Drapeaux (Pays)</option>
-                <option value="capitales">Capitales (Pays)</option>
-                <option value="formes_pays">Forme des pays</option>
-                <option value="acteurs">Acteurs</option>
-                <option value="actrices">Actrices</option>
-                <option value="realisateurs">Réalisateurs</option>
-                <option value="realisatrices">Réalisatrices</option>
-            </select>
-
-            <label>Temps par joueur :</label>
-            <select id="select-timer">
-                <option value="30">30 secondes (Rapide)</option>
-                <option value="45" selected>45 secondes (Classique)</option>
-                <option value="60">60 secondes (Long)</option>
-            </select>
-
-            <button id="btn-start-custom" disabled>LANCER LE DUEL (Attente du joueur 2...)</button>
+    <div class="mode-cards">
+      <div class="mode-card" id="card-images" data-mode="images">
+        <div class="card-glow glow-images"></div>
+        <div class="card-inner">
+          <div class="card-icon"></div>
+          <h2 class="card-title images-title">Images</h2>
+          <p class="card-desc">Reconnais des images avant que le temps ne s'écoule</p>
+          <span class="card-tag">Images & Logos</span>
         </div>
+      </div>
 
-        <div id="guest-waiting" style="display: none;">
-            <p>En attente que l'hôte configure et lance la partie...</p>
+      <div class="mode-card" id="card-quiz" data-mode="quiz">
+        <div class="card-glow glow-quiz"></div>
+        <div class="card-inner">
+          <div class="card-icon"></div>
+          <h2 class="card-title quiz-title">Quiz</h2>
+          <p class="card-desc">Réponds à des questions de culture générale face à face</p>
+          <span class="card-tag">Quiz & Culture</span>
         </div>
+      </div>
     </div>
 
-    <div id="matchmaking-container" class="menu-box" style="display: none;">
-        <div id="queue-status">
-            <div class="loader"></div>
-            <h2>Recherche d'un adversaire...</h2>
-            <p>Elo estimé : <span id="my-elo-display">1000</span></p>
-        </div>
+    <div class="private-section">
+      <p class="private-label">Partie Privée</p>
+      <div class="private-actions">
+        <button class="btn-create-private btn-create-style" id="btn-create-room-home">CRÉER UNE PARTIE PRIVÉE</button>
 
-        <div id="vs-screen" style="display: none;">
-            <div class="vs-layout">
-                <div class="player-card left">
-                    <div class="avatar">👤</div>
-                    <h3 id="p1-name">Joueur 1</h3>
-                    <span class="badge">COMMENCE</span>
-                </div>
-                <div class="vs-middle">VS</div>
-                <div class="player-card right">
-                    <div class="avatar">👤</div>
-                    <h3 id="p2-name">Joueur 2</h3>
-                    <span class="badge">RÉPOND</span>
-                </div>
-            </div>
-            <div class="match-info">
-                <p>Thème : <span id="match-theme" class="highlight">---</span></p>
-                <h1 id="match-countdown">3</h1>
-            </div>
+        <div class="join-row-home">
+          <input type="text" id="input-room-code" placeholder="Code de la partie" maxlength="4" class="join-input-home">
+          <button class="btn-join-home" id="btn-join-room">REJOINDRE</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AVATAR + bouton de personnalisation (zone droite) -->
+  <!-- IMPORTANT : placé HORS de #mode-select-container car celui-ci a une transform CSS
+       qui crée un containing block et casserait position:fixed sur .home-avatar-side -->
+  <div class="home-avatar-side">
+    <div class="home-avatar-display" id="home-avatar-display"></div>
+    <button class="btn-customize-avatar" id="btn-customize-avatar">PERSONNALISER MON AVATAR</button>
+  </div>
+
+  <!-- ÉCRAN 2 : ACCUEIL MODE -->
+  <div id="home-container" style="display:none;">
+    <div class="home-inner">
+      <button class="btn-back" id="btn-back-home">← Retour</button>
+      <img src="logo_duel.png" alt="Le Duel" class="home-logo">
+      <p class="home-mode-label" id="home-mode-label">Mode Images</p>
+
+      <div class="home-actions">
+        <button class="btn-home btn-matchmaking-style" id="btn-matchmaking">
+          <span class="btn-icon">⚡</span> JOUER EN MATCHMAKING
+        </button>
+      </div>
+
+      <div class="rules-box" id="rules-box">
+        <p class="rules-title">Règles du mode</p>
+        <ul class="rules-list" id="rules-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ÉCRAN 3 : LOBBY -->
+  <div id="lobby-container" class="menu-box" style="display:none;">
+    <button class="btn-back" id="btn-back-lobby">← Retour</button>
+    <img src="logo_duel.png" alt="Le Duel" class="game-logo">
+    <h2>Code de la partie : <span id="display-room-code" class="highlight">----</span></h2>
+    <p>Joueurs dans le salon : <span id="room-player-count">1</span>/2</p>
+
+    <div id="host-settings">
+      <h3>Paramètres de la partie</h3>
+
+      <div class="setting-block">
+        <p class="setting-label">Mode de jeu</p>
+        <div class="choice-group" id="mode-choice-group">
+          <button class="choice-btn" data-mode="images" id="choice-mode-images">Images</button>
+          <button class="choice-btn" data-mode="quiz" id="choice-mode-quiz">Quiz</button>
+        </div>
+      </div>
+
+      <div class="setting-block">
+        <p class="setting-label">Thème</p>
+        <div class="choice-group choice-group-grid" id="theme-choice-group">
+          <button class="choice-btn theme-choice" data-theme="athletes">Athlètes Français</button>
+          <button class="choice-btn theme-choice" data-theme="stades">Stades de Foot</button>
+          <button class="choice-btn theme-choice" data-theme="logospremierleague">Premier League</button>
+          <button class="choice-btn theme-choice" data-theme="logoslaliga">La Liga</button>
+          <button class="choice-btn theme-choice" data-theme="logosbundesliga">Bundesliga</button>
+          <button class="choice-btn theme-choice" data-theme="logosseriea">Serie A</button>
+          <button class="choice-btn theme-choice" data-theme="logostop14">Top 14</button>
+          <button class="choice-btn theme-choice" data-theme="logosnationsrugby">Nations Rugby</button>
+          <button class="choice-btn theme-choice" data-theme="logosnba">NBA</button>
+          <button class="choice-btn theme-choice" data-theme="logosnfl">NFL</button>
+          <button class="choice-btn theme-choice" data-theme="logosnhl">NHL</button>
+          <button class="choice-btn theme-choice" data-theme="logosmlb">MLB</button>
+          <button class="choice-btn theme-choice" data-theme="logosmls">MLS</button>
+          <button class="choice-btn theme-choice" data-theme="logosnrl">NRL</button>
+          <button class="choice-btn theme-choice" data-theme="voitures">Marques de Voitures</button>
+          <button class="choice-btn theme-choice" data-theme="politiquefr">Politiques Français</button>
+          <button class="choice-btn theme-choice" data-theme="hommesetat">Hommes/Femmes d'état</button>
+          <button class="choice-btn theme-choice" data-theme="drapeaux">Drapeaux Pays</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizculture">Culture Générale</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizhistoire">Histoire</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizgeographie">Géographie</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizsport">Sport</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizsciences">Sciences</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizcinema">Cinéma</button>
+        </div>
+      </div>
+
+      <div class="setting-block">
+        <p class="setting-label">Temps par joueur</p>
+        <div class="choice-group" id="timer-choice-group">
+          <button class="choice-btn timer-choice" data-timer="30">30 s</button>
+          <button class="choice-btn timer-choice active-choice" data-timer="45">45 s</button>
+          <button class="choice-btn timer-choice" data-timer="60">60 s</button>
+        </div>
+      </div>
+
+      <button id="btn-start-custom" disabled>LANCER LE DUEL</button>
     </div>
 
-    <div id="game-container" style="display: none;">
-        <img src="logo_duel.png" alt="Le Duel" class="game-logo">
+    <div id="guest-waiting" style="display:none;">
+      <p>En attente que l'hôte configure et lance la partie...</p>
+    </div>
+  </div>
 
-        <div id="display-area">
-        </div>
-
-        <p class="hint-text">
-            Les accents ne sont pas nécessaires<br>
-            Tapez uniquement les noms de famille des sportifs !
-        </p>
-
-        <div id="input-area">
-            <input type="text" id="answer-input" placeholder="Tape ta réponse ici..." autocomplete="off">
-            <button id="pass-btn">PASSER</button>
-        </div>
-
-        <div id="scoreboard">
-            <div class="player">Toi: <span id="my-time">45</span>s</div>
-            <div class="player">Adversaire: <span id="opponent-time">45</span>s</div>
-        </div>
-
-        <div id="game-over-screen" style="display: none;">
-            <h2 id="winner-message">VICTOIRE !</h2>
-            <p>Le temps est écoulé.</p>
-            <button id="restart-btn" onclick="location.reload()">REJOUER</button>
-        </div>
+  <!-- ÉCRAN 4 : MATCHMAKING -->
+  <div id="matchmaking-container" class="menu-box" style="display:none;">
+    <button class="btn-back" id="btn-back-matchmaking">← Retour</button>
+    <div id="queue-status">
+      <div class="loader"></div>
+      <h2>Recherche d'un adversaire...</h2>
+      <p>Elo estimé : <span id="my-elo-display">1000</span></p>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
+    <div id="vs-screen" style="display:none;">
+      <div class="vs-layout">
+        <div class="player-card left">
+          <div class="avatar"></div>
+          <h3 id="p1-name">Joueur 1</h3>
+          <span class="badge">COMMENCE</span>
+        </div>
+
+        <div class="vs-middle">VS</div>
+
+        <div class="player-card right">
+          <div class="avatar"></div>
+          <h3 id="p2-name">Joueur 2</h3>
+          <span class="badge">RÉPOND</span>
+        </div>
+      </div>
+
+      <div class="match-info">
+        <p>Thème : <span id="match-theme" class="highlight">---</span></p>
+        <h1 id="match-countdown">3</h1>
+      </div>
+    </div>
+  </div>
+
+  <!-- ÉCRAN 5 : JEU -->
+  <div id="game-container" style="display:none;">
+    <button class="btn-back" id="btn-back-game">← Retour</button>
+    <!-- Avatars (positionnés en absolu sur desktop, en ligne sur mobile via .game-avatars-row) -->
+    <div class="game-avatars-row">
+      <div class="game-avatar-slot left" id="game-avatar-me" data-label="TOI"></div>
+      <div class="game-avatar-slot right" id="game-avatar-opp" data-label="ADVERSAIRE"></div>
+    </div>
+
+    <img src="logo_duel.png" alt="Le Duel" class="game-logo">
+    <div id="display-area"></div>
+
+    <div id="quiz-display-area" style="display:none;">
+      <p id="quiz-question-text"></p>
+    </div>
+
+    <p class="hint-text">Les accents ne sont pas nécessaires<br>Tape uniquement les noms de famille des sportifs !</p>
+
+    <div id="input-area">
+      <input type="text" id="answer-input" placeholder="Tape ta réponse ici..." autocomplete="off">
+      <button id="pass-btn">PASSER</button>
+    </div>
+
+    <div id="scoreboard">
+      <div class="player">Toi <span id="my-time">45</span>s</div>
+      <div class="player">Adversaire <span id="opponent-time">45</span>s</div>
+    </div>
+
+    <div id="game-over-screen" style="display:none;">
+      <img src="logo_duel.png" alt="Le Duel" class="game-over-logo">
+      <h2 id="winner-message">VICTOIRE !</h2>
+      <p>Le temps est écoulé.</p>
+      <button id="restart-btn">REJOUER</button>
+    </div>
+  </div>
+
+  <!-- MODALE : PERSONNALISATION D'AVATAR -->
+  <div class="avatar-modal-overlay" id="avatar-modal-overlay">
+    <div class="avatar-modal" id="avatar-modal">
+      <div class="avatar-modal-preview">
+        <h2>Ton avatar</h2>
+        <p class="avatar-modal-subtitle">Personnalise-le à ton goût</p>
+        <div class="avatar-modal-preview-box" id="avatar-preview"></div>
+        <div class="avatar-modal-preview-actions">
+          <button class="preview-action-btn" id="preview-test-win">Tester victoire</button>
+          <button class="preview-action-btn" id="preview-test-lose">Tester défaite</button>
+        </div>
+      </div>
+
+      <div class="avatar-modal-options" id="avatar-options">
+        <!-- Rempli dynamiquement par script.js -->
+      </div>
+
+      <div class="avatar-modal-footer">
+        <button class="btn-modal btn-modal-cancel" id="btn-avatar-cancel">ANNULER</button>
+        <button class="btn-modal btn-modal-save" id="btn-avatar-save">ENREGISTRER</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="avatar.js"></script>
+  <script src="script.js"></script>
 </body>
-
 </html>

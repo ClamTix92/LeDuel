@@ -1,0 +1,5441 @@
+{
+  "quizculture": [
+    {
+      "text": "Combien de côtés a un hexagone ?",
+      "answer": "6",
+      "acceptedAnswers": [
+        "6",
+        "six"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le plus grand océan du monde ?",
+      "answer": "pacifique",
+      "acceptedAnswers": [
+        "pacifique",
+        "océan pacifique",
+        "ocean pacifique"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle planète est la plus proche du Soleil ?",
+      "answer": "mercure",
+      "acceptedAnswers": [
+        "mercure"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de basket-ball sur le terrain ?",
+      "answer": "5",
+      "acceptedAnswers": [
+        "5",
+        "cinq"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale de l'Espagne ?",
+      "answer": "madrid",
+      "acceptedAnswers": [
+        "madrid"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Qui a peint la Joconde ?",
+      "answer": "leonard de vinci",
+      "acceptedAnswers": [
+        "leonard de vinci",
+        "léonard de vinci",
+        "da vinci",
+        "vinci"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le symbole chimique de l'eau ?",
+      "answer": "h2o",
+      "acceptedAnswers": [
+        "h2o"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la couleur du ciel par temps clair ?",
+      "answer": "bleu",
+      "acceptedAnswers": [
+        "bleu",
+        "bleue"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de continents y a-t-il sur Terre ?",
+      "answer": "7",
+      "acceptedAnswers": [
+        "7",
+        "sept"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel pays se trouve la tour Eiffel ?",
+      "answer": "france",
+      "acceptedAnswers": [
+        "france"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel animal est le roi de la jungle ?",
+      "answer": "lion",
+      "acceptedAnswers": [
+        "lion",
+        "le lion"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de secondes y a-t-il dans une minute ?",
+      "answer": "60",
+      "acceptedAnswers": [
+        "60",
+        "soixante"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le plus petit pays du monde ?",
+      "answer": "vatican",
+      "acceptedAnswers": [
+        "vatican",
+        "le vatican",
+        "saint-siege",
+        "saint siege"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de planètes composent notre système solaire ?",
+      "answer": "8",
+      "acceptedAnswers": [
+        "8",
+        "huit"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le fleuve le plus long du monde ?",
+      "answer": "nil",
+      "acceptedAnswers": [
+        "nil",
+        "le nil",
+        "amazone",
+        "le nil ou l'amazone"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "De quelle couleur est une émeraude ?",
+      "answer": "vert",
+      "acceptedAnswers": [
+        "vert",
+        "verte",
+        "vert fonce"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale de l'Italie ?",
+      "answer": "rome",
+      "acceptedAnswers": [
+        "rome"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de minutes y a-t-il dans une heure ?",
+      "answer": "60",
+      "acceptedAnswers": [
+        "60",
+        "soixante"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est l'animal terrestre le plus rapide ?",
+      "answer": "guepard",
+      "acceptedAnswers": [
+        "guepard",
+        "guépard",
+        "cheetah"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de grammes y a-t-il dans un kilogramme ?",
+      "answer": "1000",
+      "acceptedAnswers": [
+        "1000",
+        "mille"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quelle ville se trouvent les pyramides de Gizeh ?",
+      "answer": "le caire",
+      "acceptedAnswers": [
+        "le caire",
+        "caire",
+        "gizeh",
+        "egypte"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de cordes a une guitare classique ?",
+      "answer": "6",
+      "acceptedAnswers": [
+        "6",
+        "six"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le plus grand pays du monde par sa superficie ?",
+      "answer": "russie",
+      "acceptedAnswers": [
+        "russie",
+        "la russie"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel organe du corps humain pompe le sang ?",
+      "answer": "coeur",
+      "acceptedAnswers": [
+        "coeur",
+        "cœur",
+        "le coeur"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la couleur associée à la paix ?",
+      "answer": "blanc",
+      "acceptedAnswers": [
+        "blanc",
+        "blanche"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de jours y a-t-il dans une semaine ?",
+      "answer": "7",
+      "acceptedAnswers": [
+        "7",
+        "sept"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel gaz les plantes absorbent-elles pour faire la photosynthèse ?",
+      "answer": "co2",
+      "acceptedAnswers": [
+        "co2",
+        "dioxyde de carbone",
+        "gaz carbonique"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le nom du premier satellite artificiel envoyé dans l'espace ?",
+      "answer": "spoutnik",
+      "acceptedAnswers": [
+        "spoutnik",
+        "sputnik"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de mois comporte une année ?",
+      "answer": "12",
+      "acceptedAnswers": [
+        "12",
+        "douze"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le plus grand mammifère marin ?",
+      "answer": "baleine bleue",
+      "acceptedAnswers": [
+        "baleine bleue",
+        "baleine",
+        "rorqual bleu"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale de l'Allemagne ?",
+      "answer": "berlin",
+      "acceptedAnswers": [
+        "berlin"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien y a-t-il de couleurs dans un arc-en-ciel ?",
+      "answer": "7",
+      "acceptedAnswers": [
+        "7",
+        "sept"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel écrivain a créé le personnage de Sherlock Holmes ?",
+      "answer": "conan doyle",
+      "acceptedAnswers": [
+        "conan doyle",
+        "arthur conan doyle",
+        "doyle"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le continent le plus chaud du monde ?",
+      "answer": "afrique",
+      "acceptedAnswers": [
+        "afrique",
+        "l'afrique"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de faces a un cube ?",
+      "answer": "6",
+      "acceptedAnswers": [
+        "6",
+        "six"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le nom de la monnaie utilisée au Japon ?",
+      "answer": "yen",
+      "acceptedAnswers": [
+        "yen",
+        "le yen"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel scientifique a formulé la théorie de la relativité ?",
+      "answer": "einstein",
+      "acceptedAnswers": [
+        "einstein",
+        "albert einstein"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel sport utilise-t-on un volant ?",
+      "answer": "badminton",
+      "acceptedAnswers": [
+        "badminton"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le plus haut sommet du monde ?",
+      "answer": "everest",
+      "acceptedAnswers": [
+        "everest",
+        "mont everest",
+        "chomolungma"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de joueurs y a-t-il dans une équipe de volleyball ?",
+      "answer": "6",
+      "acceptedAnswers": [
+        "6",
+        "six"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Qui a écrit 'Les Misérables' ?",
+      "answer": "victor hugo",
+      "acceptedAnswers": [
+        "victor hugo",
+        "hugo",
+        "victor hugo"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de l'Australie ?",
+      "answer": "canberra",
+      "acceptedAnswers": [
+        "canberra",
+        "camberra",
+        "canbera"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "En quelle année a eu lieu la Révolution française ?",
+      "answer": "1789",
+      "acceptedAnswers": [
+        "1789"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le symbole chimique de l'or ?",
+      "answer": "au",
+      "acceptedAnswers": [
+        "au",
+        "Au",
+        "AU"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien d'os compte le corps humain adulte ?",
+      "answer": "206",
+      "acceptedAnswers": [
+        "206"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Qui a peint la chapelle Sixtine ?",
+      "answer": "michel-ange",
+      "acceptedAnswers": [
+        "michel-ange",
+        "michel ange",
+        "michelange"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale du Brésil ?",
+      "answer": "brasilia",
+      "acceptedAnswers": [
+        "brasilia",
+        "brasília",
+        "brazilia"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le gaz le plus abondant dans l'atmosphère terrestre ?",
+      "answer": "azote",
+      "acceptedAnswers": [
+        "azote",
+        "n2",
+        "nitrogen"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quelle ville se trouve le Colisée ?",
+      "answer": "rome",
+      "acceptedAnswers": [
+        "rome",
+        "Roma",
+        "roma"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de touches compte un piano standard ?",
+      "answer": "88",
+      "acceptedAnswers": [
+        "88"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Qui a composé la Symphonie n°9 en étant sourd ?",
+      "answer": "beethoven",
+      "acceptedAnswers": [
+        "beethoven",
+        "ludwig beethoven",
+        "van beethoven"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pays a inventé le papier ?",
+      "answer": "chine",
+      "acceptedAnswers": [
+        "chine",
+        "la chine",
+        "china"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle planète est surnommée la planète rouge ?",
+      "answer": "mars",
+      "acceptedAnswers": [
+        "mars",
+        "Mars"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "En quelle année l'homme a-t-il marché sur la Lune pour la première fois ?",
+      "answer": "1969",
+      "acceptedAnswers": [
+        "1969"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le plus long fleuve d'Europe ?",
+      "answer": "volga",
+      "acceptedAnswers": [
+        "volga",
+        "la volga"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel philosophe grec est le maître d'Alexandre le Grand ?",
+      "answer": "aristote",
+      "acceptedAnswers": [
+        "aristote",
+        "aristotle",
+        "aristoteles"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel pays se trouve le Taj Mahal ?",
+      "answer": "inde",
+      "acceptedAnswers": [
+        "inde",
+        "india",
+        "l'inde"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de dents a un adulte avec ses dents de sagesse ?",
+      "answer": "32",
+      "acceptedAnswers": [
+        "32"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le nom de la monnaie utilisée au Royaume-Uni ?",
+      "answer": "livre sterling",
+      "acceptedAnswers": [
+        "livre sterling",
+        "livre",
+        "pound"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel peintre espagnol a fondé le cubisme avec Braque ?",
+      "answer": "picasso",
+      "acceptedAnswers": [
+        "picasso",
+        "pablo picasso",
+        "pablo"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la formule chimique du sel de cuisine ?",
+      "answer": "nacl",
+      "acceptedAnswers": [
+        "nacl",
+        "NaCl",
+        "chlorure de sodium"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de régions compte la France métropolitaine ?",
+      "answer": "13",
+      "acceptedAnswers": [
+        "13",
+        "treize"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel auteur a écrit 'Don Quichotte' ?",
+      "answer": "cervantes",
+      "acceptedAnswers": [
+        "cervantes",
+        "miguel cervantes",
+        "de cervantes"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le plus grand désert chaud du monde ?",
+      "answer": "sahara",
+      "acceptedAnswers": [
+        "sahara",
+        "le sahara"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de mètres mesure un marathon ?",
+      "answer": "42195",
+      "acceptedAnswers": [
+        "42195",
+        "42,195 km",
+        "42 km"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le symbole chimique du fer ?",
+      "answer": "fe",
+      "acceptedAnswers": [
+        "fe",
+        "Fe",
+        "FE"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quelle ville se déroule l'opéra 'Carmen' de Bizet ?",
+      "answer": "seville",
+      "acceptedAnswers": [
+        "seville",
+        "séville",
+        "sevilla"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pays a offert la Statue de la Liberté aux États-Unis ?",
+      "answer": "france",
+      "acceptedAnswers": [
+        "france",
+        "la france"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de vertèbres compte la colonne vertébrale humaine ?",
+      "answer": "33",
+      "acceptedAnswers": [
+        "33",
+        "trente-trois"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel scientifique a découvert la pénicilline ?",
+      "answer": "fleming",
+      "acceptedAnswers": [
+        "fleming",
+        "alexander fleming",
+        "alexandre fleming"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de l'Argentine ?",
+      "answer": "buenos aires",
+      "acceptedAnswers": [
+        "buenos aires",
+        "buenos-aires",
+        "Buenos Aires"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le nom du détroit qui sépare l'Europe de l'Afrique ?",
+      "answer": "gibraltar",
+      "acceptedAnswers": [
+        "gibraltar",
+        "detroit de gibraltar",
+        "détroit de gibraltar"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de saisons comporte l'année ?",
+      "answer": "4",
+      "acceptedAnswers": [
+        "4",
+        "quatre"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel romancier français a écrit 'Le Comte de Monte-Cristo' ?",
+      "answer": "dumas",
+      "acceptedAnswers": [
+        "dumas",
+        "alexandre dumas",
+        "alexandre dumas pere"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "De quelle matière est fait le diamant ?",
+      "answer": "carbone",
+      "acceptedAnswers": [
+        "carbone",
+        "carbon",
+        "c"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale du Canada ?",
+      "answer": "ottawa",
+      "acceptedAnswers": [
+        "ottawa",
+        "otawa",
+        "Ottawa"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel musicien est surnommé 'Le Roi du Rock' ?",
+      "answer": "elvis presley",
+      "acceptedAnswers": [
+        "elvis presley",
+        "elvis",
+        "presley"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de football sur le terrain ?",
+      "answer": "11",
+      "acceptedAnswers": [
+        "11",
+        "onze"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le plus petit os du corps humain ?",
+      "answer": "etrier",
+      "acceptedAnswers": [
+        "etrier",
+        "étrier",
+        "stapes"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle mer borde Israël à l'ouest ?",
+      "answer": "mediterranee",
+      "acceptedAnswers": [
+        "mediterranee",
+        "méditerranée",
+        "mer mediterranee"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pharaon a fait construire la Grande Pyramide de Gizeh ?",
+      "answer": "Khéops",
+      "acceptedAnswers": [
+        "kheops",
+        "khéops",
+        "cheops",
+        "khufu"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quelle ville est né Napoléon Bonaparte ?",
+      "answer": "Ajaccio",
+      "acceptedAnswers": [
+        "ajaccio"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel élément chimique a pour symbole 'W' ?",
+      "answer": "Tungstène",
+      "acceptedAnswers": [
+        "tungstene",
+        "tungstène",
+        "wolfram"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel peintre néerlandais s'est coupé une oreille ?",
+      "answer": "Van Gogh",
+      "acceptedAnswers": [
+        "van gogh",
+        "vincent van gogh",
+        "vincent"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "En quelle année fut signé le traité de Versailles mettant fin à la Première Guerre mondiale ?",
+      "answer": "1919",
+      "acceptedAnswers": [
+        "1919"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel mathématicien grec a calculé la circonférence de la Terre dès l'Antiquité ?",
+      "answer": "Ératosthène",
+      "acceptedAnswers": [
+        "eratosthene",
+        "ératosthène",
+        "eratosthenes"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle est la capitale de la Nouvelle-Zélande ?",
+      "answer": "Wellington",
+      "acceptedAnswers": [
+        "wellington"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel compositeur autrichien a écrit 'La Flûte enchantée' ?",
+      "answer": "Mozart",
+      "acceptedAnswers": [
+        "mozart",
+        "wolfgang mozart",
+        "amadeus mozart"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle est la langue officielle du Brésil ?",
+      "answer": "Portugais",
+      "acceptedAnswers": [
+        "portugais",
+        "le portugais",
+        "portugues"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel Empire a construit la Voie Appienne ?",
+      "answer": "Rome",
+      "acceptedAnswers": [
+        "rome",
+        "romain",
+        "empire romain",
+        "les romains"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Combien d'arrondissements compte Paris ?",
+      "answer": "20",
+      "acceptedAnswers": [
+        "20",
+        "vingt"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel écrivain irlandais a écrit 'Ulysse' ?",
+      "answer": "James Joyce",
+      "acceptedAnswers": [
+        "james joyce",
+        "joyce"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom du vaisseau spatial d'Apollo 11 qui s'est posé sur la Lune ?",
+      "answer": "Eagle",
+      "acceptedAnswers": [
+        "eagle",
+        "aigle",
+        "le eagle"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle civilisation a inventé le zéro ?",
+      "answer": "Indienne",
+      "acceptedAnswers": [
+        "indienne",
+        "inde",
+        "hindoue",
+        "maya"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quel pays se trouve le lac Baïkal ?",
+      "answer": "Russie",
+      "acceptedAnswers": [
+        "russie",
+        "russia"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel peintre de la Renaissance a aussi conçu des machines volantes ?",
+      "answer": "Léonard de Vinci",
+      "acceptedAnswers": [
+        "leonard de vinci",
+        "léonard de vinci",
+        "de vinci",
+        "vinci"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom du parlement israélien ?",
+      "answer": "Knesset",
+      "acceptedAnswers": [
+        "knesset",
+        "la knesset"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "En quelle année Christophe Colomb a-t-il découvert l'Amérique ?",
+      "answer": "1492",
+      "acceptedAnswers": [
+        "1492"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel physicien a énoncé les trois lois du mouvement ?",
+      "answer": "Newton",
+      "acceptedAnswers": [
+        "newton",
+        "isaac newton"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel pays est le premier producteur mondial de cacao ?",
+      "answer": "Côte d'Ivoire",
+      "acceptedAnswers": [
+        "cote d'ivoire",
+        "côte d'ivoire",
+        "cote divoire",
+        "ivory coast"
+      ],
+      "difficulty": "hard"
+    }
+  ],
+  "quizhistoire": [
+    {
+      "text": "Qui a construit les pyramides de Gizeh ?",
+      "answer": "les egyptiens",
+      "acceptedAnswers": [
+        "les egyptiens",
+        "egyptiens",
+        "egypte",
+        "les pharaons",
+        "pharaons"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel roi français était surnommé le Roi-Soleil ?",
+      "answer": "louis xiv",
+      "acceptedAnswers": [
+        "louis xiv",
+        "louis 14",
+        "louis quatorze",
+        "xiv"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Sur quel continent se trouvait l'Empire romain ?",
+      "answer": "europe",
+      "acceptedAnswers": [
+        "europe",
+        "l europe"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelait le bateau du premier voyage de Christophe Colomb ?",
+      "answer": "santa maria",
+      "acceptedAnswers": [
+        "santa maria",
+        "la santa maria"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle reine d'Egypte était célèbre pour sa beauté et son intelligence ?",
+      "answer": "cleopatre",
+      "acceptedAnswers": [
+        "cleopatre",
+        "cleopatra",
+        "cleopâtre"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel continent Christophe Colomb a-t-il atteint en 1492 ?",
+      "answer": "amerique",
+      "acceptedAnswers": [
+        "amerique",
+        "l amerique",
+        "amérique",
+        "amériques",
+        "ameriques"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel général corse est devenu empereur des Français ?",
+      "answer": "napoleon",
+      "acceptedAnswers": [
+        "napoleon",
+        "napoléon",
+        "napoleon bonaparte",
+        "napoléon bonaparte",
+        "bonaparte"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quelle ville se trouve la tour Eiffel, construite en 1889 ?",
+      "answer": "paris",
+      "acceptedAnswers": [
+        "paris"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel mur célèbre séparait Berlin en deux de 1961 à 1989 ?",
+      "answer": "mur de berlin",
+      "acceptedAnswers": [
+        "mur de berlin",
+        "le mur de berlin",
+        "mur berlin"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle civilisation a inventé les Jeux olympiques dans l'Antiquité ?",
+      "answer": "les grecs",
+      "acceptedAnswers": [
+        "les grecs",
+        "grecs",
+        "grece",
+        "grèce",
+        "la grece"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le prénom de la Jeanne qui a combattu pour libérer la France au XVe siècle ?",
+      "answer": "jeanne",
+      "acceptedAnswers": [
+        "jeanne",
+        "jeanne d arc",
+        "jeanne d'arc"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "En quelle année a débuté la Première Guerre mondiale ?",
+      "answer": "1914",
+      "acceptedAnswers": [
+        "1914"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "En quelle année s'est terminée la Seconde Guerre mondiale ?",
+      "answer": "1945",
+      "acceptedAnswers": [
+        "1945"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel pays a envoyé le premier homme dans l'espace en 1961 ?",
+      "answer": "urss",
+      "acceptedAnswers": [
+        "urss",
+        "russie",
+        "union sovietique",
+        "union soviétique",
+        "sovietique"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelait le premier homme à marcher sur la Lune ?",
+      "answer": "neil armstrong",
+      "acceptedAnswers": [
+        "neil armstrong",
+        "armstrong",
+        "neil"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la langue parlée dans l'Antiquité par les Romains ?",
+      "answer": "latin",
+      "acceptedAnswers": [
+        "latin",
+        "le latin"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale de l'Empire romain ?",
+      "answer": "rome",
+      "acceptedAnswers": [
+        "rome"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Qui était le chef des Gaulois qui résistait aux Romains selon Astérix ?",
+      "answer": "vercingetorix",
+      "acceptedAnswers": [
+        "vercingetorix",
+        "vercingétorix"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel pays a construit la Grande Muraille ?",
+      "answer": "chine",
+      "acceptedAnswers": [
+        "chine",
+        "la chine"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel fleuve traversait l'Egypte antique et était essentiel à sa civilisation ?",
+      "answer": "nil",
+      "acceptedAnswers": [
+        "nil",
+        "le nil"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment appelait-on les rois de l'Egypte ancienne ?",
+      "answer": "pharaons",
+      "acceptedAnswers": [
+        "pharaons",
+        "pharaon",
+        "le pharaon"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel pays est le berceau des Jeux olympiques modernes, réapparus en 1896 ?",
+      "answer": "grece",
+      "acceptedAnswers": [
+        "grece",
+        "grèce",
+        "la grece",
+        "la grèce",
+        "grecs"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel explorateur portugais a été le premier à faire le tour du monde ?",
+      "answer": "magellan",
+      "acceptedAnswers": [
+        "magellan",
+        "fernand de magellan",
+        "fernao de magalhaes"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle révolution a éclaté en Russie en 1917 ?",
+      "answer": "revolution russe",
+      "acceptedAnswers": [
+        "revolution russe",
+        "révolution russe",
+        "revolution bolchevique",
+        "revolution d octobre",
+        "revolution"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Sur quelle île Napoléon a-t-il été exilé après Waterloo ?",
+      "answer": "sainte helene",
+      "acceptedAnswers": [
+        "sainte helene",
+        "sainte-helene",
+        "sainte hélène",
+        "helene",
+        "saint helene"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel scientifique a découvert la gravitation en voyant tomber une pomme ?",
+      "answer": "newton",
+      "acceptedAnswers": [
+        "newton",
+        "isaac newton"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Qui a peint la Joconde au XVIe siècle ?",
+      "answer": "leonard de vinci",
+      "acceptedAnswers": [
+        "leonard de vinci",
+        "léonard de vinci",
+        "de vinci",
+        "vinci",
+        "da vinci"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel peuple a construit le Colisée à Rome ?",
+      "answer": "les romains",
+      "acceptedAnswers": [
+        "les romains",
+        "romains",
+        "rome",
+        "romains antiques"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelait le premier cosmonaute à avoir voyagé dans l'espace ?",
+      "answer": "gagarine",
+      "acceptedAnswers": [
+        "gagarine",
+        "youri gagarine",
+        "yuri gagarine",
+        "youri",
+        "yuri"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel empire a été fondé par Gengis Khan au XIIIe siècle ?",
+      "answer": "empire mongol",
+      "acceptedAnswers": [
+        "empire mongol",
+        "mongol",
+        "mongolie",
+        "les mongols"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel pays avait pour chef un personnage appelé le Pharaon dans l'Antiquité ?",
+      "answer": "egypte",
+      "acceptedAnswers": [
+        "egypte",
+        "égypte",
+        "l egypte",
+        "l egypte antique"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle ville française a été le théâtre de la prise de la Bastille en 1789 ?",
+      "answer": "paris",
+      "acceptedAnswers": [
+        "paris"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel célèbre cheval de bois a permis aux Grecs de s'emparer de Troie ?",
+      "answer": "cheval de troie",
+      "acceptedAnswers": [
+        "cheval de troie",
+        "le cheval de troie",
+        "cheval troie"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel pays se trouve la cité inca du Machu Picchu ?",
+      "answer": "perou",
+      "acceptedAnswers": [
+        "perou",
+        "pérou",
+        "le perou"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel empire a été dirigé par Jules César ?",
+      "answer": "empire romain",
+      "acceptedAnswers": [
+        "empire romain",
+        "rome",
+        "romain",
+        "republique romaine"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel pays a lancé les bombes atomiques sur le Japon en 1945 ?",
+      "answer": "etats-unis",
+      "acceptedAnswers": [
+        "etats-unis",
+        "états-unis",
+        "usa",
+        "amerique",
+        "etats unis"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelait le bateau sur lequel les pèlerins sont partis fonder l'Amérique en 1620 ?",
+      "answer": "mayflower",
+      "acceptedAnswers": [
+        "mayflower",
+        "le mayflower"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle invention de Gutenberg au XVe siècle a révolutionné la diffusion du savoir ?",
+      "answer": "imprimerie",
+      "acceptedAnswers": [
+        "imprimerie",
+        "l imprimerie",
+        "presse",
+        "presse a imprimer"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel roi anglais a signé la Magna Carta en 1215 ?",
+      "answer": "jean sans terre",
+      "acceptedAnswers": [
+        "jean sans terre",
+        "jean",
+        "john"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quelle ville a été assassiné François-Ferdinand en 1914 ?",
+      "answer": "sarajevo",
+      "acceptedAnswers": [
+        "sarajevo"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pharaon est associé au tombeau découvert par Howard Carter en 1922 ?",
+      "answer": "toutankhamon",
+      "acceptedAnswers": [
+        "toutankhamon",
+        "toutankamon",
+        "tutankhamun"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle bataille en 732 a stoppé l'avancée arabe en France ?",
+      "answer": "poitiers",
+      "acceptedAnswers": [
+        "poitiers",
+        "tours",
+        "bataille de poitiers"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel traité a mis fin à la Première Guerre mondiale en 1919 ?",
+      "answer": "versailles",
+      "acceptedAnswers": [
+        "versailles",
+        "traite de versailles"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Qui était le premier président des États-Unis ?",
+      "answer": "washington",
+      "acceptedAnswers": [
+        "washington",
+        "george washington"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quelle ville Napoléon a-t-il été vaincu en 1815 ?",
+      "answer": "waterloo",
+      "acceptedAnswers": [
+        "waterloo"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel empire avait Constantinople pour capitale ?",
+      "answer": "byzantin",
+      "acceptedAnswers": [
+        "byzantin",
+        "empire byzantin",
+        "empire romain d orient"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "En quelle année Christophe Colomb a-t-il atteint l'Amérique ?",
+      "answer": "1492",
+      "acceptedAnswers": [
+        "1492"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel souverain mongol a conquis la Perse, la Russie et la Chine au XIIIe siècle ?",
+      "answer": "gengis khan",
+      "acceptedAnswers": [
+        "gengis khan",
+        "genghis khan",
+        "gengis"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle reine des Scots a été décapitée sur ordre d'Élisabeth Ire en 1587 ?",
+      "answer": "marie stuart",
+      "acceptedAnswers": [
+        "marie stuart",
+        "marie",
+        "mary stuart"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel empire a été fondé par Auguste après Jules César ?",
+      "answer": "romain",
+      "acceptedAnswers": [
+        "romain",
+        "empire romain",
+        "rome"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel peuple a envahi l'Angleterre en 1066 sous Guillaume le Conquérant ?",
+      "answer": "normands",
+      "acceptedAnswers": [
+        "normands",
+        "les normands",
+        "normand"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel conquistador espagnol a conquis l'empire aztèque ?",
+      "answer": "cortes",
+      "acceptedAnswers": [
+        "cortes",
+        "hernan cortes",
+        "cortez"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle ville italienne a été ensevelie par le Vésuve en 79 après J.-C. ?",
+      "answer": "pompei",
+      "acceptedAnswers": [
+        "pompei",
+        "pompeia",
+        "pompeii"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "En quelle année la Révolution française a-t-elle débuté ?",
+      "answer": "1789",
+      "acceptedAnswers": [
+        "1789"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel philosophe grec a été le maître d'Alexandre le Grand ?",
+      "answer": "aristote",
+      "acceptedAnswers": [
+        "aristote",
+        "aristotle"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle guerre opposa Athènes et Sparte au Ve siècle avant J.-C. ?",
+      "answer": "peloponnese",
+      "acceptedAnswers": [
+        "peloponnese",
+        "guerre du peloponnese",
+        "peloponnesienne"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel débarquement allié a eu lieu en Normandie le 6 juin 1944 ?",
+      "answer": "d-day",
+      "acceptedAnswers": [
+        "d-day",
+        "jour j",
+        "debarquement"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel pays s'est déroulée la bataille de Stalingrad ?",
+      "answer": "russie",
+      "acceptedAnswers": [
+        "russie",
+        "urss",
+        "union sovietique"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pays a aboli l'esclavage après sa guerre civile en 1865 ?",
+      "answer": "etats-unis",
+      "acceptedAnswers": [
+        "etats-unis",
+        "etats unis",
+        "usa",
+        "amerique"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel héros troyen est le personnage central de l'Iliade d'Homère ?",
+      "answer": "achille",
+      "acceptedAnswers": [
+        "achille",
+        "achilles"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel souverain persan a tenté d'envahir la Grèce à Marathon en 490 avant J.-C. ?",
+      "answer": "darius",
+      "acceptedAnswers": [
+        "darius",
+        "darius 1er",
+        "darius ier"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Comment s'appelait le célèbre code de lois babylonien gravé sur une stèle ?",
+      "answer": "hammurabi",
+      "acceptedAnswers": [
+        "hammurabi",
+        "code d hammurabi",
+        "code hammurabi"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel monarque français a été guillotiné en 1793 ?",
+      "answer": "louis xvi",
+      "acceptedAnswers": [
+        "louis xvi",
+        "louis 16",
+        "louis seize"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "En quelle année l'URSS s'est-elle effondrée ?",
+      "answer": "1991",
+      "acceptedAnswers": [
+        "1991"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel conquistador espagnol a conquis l'empire inca ?",
+      "answer": "pizarro",
+      "acceptedAnswers": [
+        "pizarro",
+        "francisco pizarro"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel empire dominait le Moyen-Orient avant d'être vaincu par Alexandre le Grand ?",
+      "answer": "perse",
+      "acceptedAnswers": [
+        "perse",
+        "empire perse",
+        "achemenide"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pape a couronné Charlemagne en l'an 800 ?",
+      "answer": "leon iii",
+      "acceptedAnswers": [
+        "leon iii",
+        "leon 3",
+        "leon"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel général carthaginois a traversé les Alpes avec des éléphants ?",
+      "answer": "hannibal",
+      "acceptedAnswers": [
+        "hannibal",
+        "hannibal barca"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "En quelle année a eu lieu la prise de Constantinople par les Ottomans ?",
+      "answer": "1453",
+      "acceptedAnswers": [
+        "1453"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pays a fondé la première démocratie de l'histoire dans l'Antiquité ?",
+      "answer": "grece",
+      "acceptedAnswers": [
+        "grece",
+        "athenes",
+        "grece antique"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel roi de France est mort à la croisade en 1270 et a été canonisé ?",
+      "answer": "louis ix",
+      "acceptedAnswers": [
+        "louis ix",
+        "saint louis",
+        "louis 9"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle maladie a décimé un tiers de la population européenne au XIVe siècle ?",
+      "answer": "peste noire",
+      "acceptedAnswers": [
+        "peste noire",
+        "peste",
+        "mort noire"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel tsar russe a modernisé la Russie et fondé Saint-Pétersbourg au XVIIIe siècle ?",
+      "answer": "pierre le grand",
+      "acceptedAnswers": [
+        "pierre le grand",
+        "pierre 1er",
+        "pierre ier"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle bataille de 1066 a vu Guillaume le Conquérant vaincre les Anglais ?",
+      "answer": "hastings",
+      "acceptedAnswers": [
+        "hastings",
+        "bataille de hastings"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel empire ottoman a pris le nom de quel pays actuel au XXe siècle ?",
+      "answer": "turquie",
+      "acceptedAnswers": [
+        "turquie",
+        "turkey"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel philosophe grec a été condamné à mort par les Athéniens en 399 avant J.-C. ?",
+      "answer": "socrate",
+      "acceptedAnswers": [
+        "socrate",
+        "socrates"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel célèbre traité de 1648 a mis fin à la guerre de Trente Ans ?",
+      "answer": "westphalie",
+      "acceptedAnswers": [
+        "westphalie",
+        "traite de westphalie",
+        "paix de westphalie"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "En quelle année Napoléon a-t-il été sacré empereur des Français ?",
+      "answer": "1804",
+      "acceptedAnswers": [
+        "1804"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel empereur romain a fait construire le Panthéon sous sa forme actuelle au IIe siècle ?",
+      "answer": "Hadrien",
+      "acceptedAnswers": [
+        "hadrien",
+        "hadrian",
+        "publius aelius hadrianus"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle bataille de 1571 a stoppé l'expansion ottomane en Méditerranée ?",
+      "answer": "Lépante",
+      "acceptedAnswers": [
+        "lepante",
+        "lepanto",
+        "bataille de lepante"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel roi perse a ordonné la construction de Persépolis au Ve siècle avant J.-C. ?",
+      "answer": "Darius Ier",
+      "acceptedAnswers": [
+        "darius",
+        "darius ier",
+        "darius premier"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel souverain aztèque régnait lors de la conquête espagnole de Cortés ?",
+      "answer": "Moctezuma",
+      "acceptedAnswers": [
+        "moctezuma",
+        "montezuma",
+        "moctezuma ii"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle dynastie a régné sur la Chine lors de la construction de la Grande Muraille au XVIe siècle ?",
+      "answer": "Ming",
+      "acceptedAnswers": [
+        "ming",
+        "dynastie ming",
+        "les ming"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel amiral japonais a planifié l'attaque de Pearl Harbor en 1941 ?",
+      "answer": "Yamamoto",
+      "acceptedAnswers": [
+        "yamamoto",
+        "isoroku yamamoto",
+        "isoroku"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "En quelle année Charles Martel a-t-il remporté la bataille de Poitiers ?",
+      "answer": "732",
+      "acceptedAnswers": [
+        "732",
+        "732 ap jc",
+        "732 apres jc"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel roi wisigoth a mis à sac Rome en 410 après J.-C. ?",
+      "answer": "Alaric",
+      "acceptedAnswers": [
+        "alaric",
+        "alaric ier",
+        "alaric premier"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel traité de 1783 a reconnu l'indépendance des États-Unis ?",
+      "answer": "Paris",
+      "acceptedAnswers": [
+        "paris",
+        "traite de paris",
+        "paix de paris"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel empire mésoaméricain avait Tenochtitlan pour capitale ?",
+      "answer": "Aztèque",
+      "acceptedAnswers": [
+        "azteque",
+        "empire azteque",
+        "azteques"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel général romain a assassiné Jules César le 15 mars 44 avant J.-C. ?",
+      "answer": "Brutus",
+      "acceptedAnswers": [
+        "brutus",
+        "marcus brutus",
+        "marcus junius brutus"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle île fut le lieu du premier exil de Napoléon en 1814 ?",
+      "answer": "Elbe",
+      "acceptedAnswers": [
+        "elbe",
+        "ile d elbe",
+        "isle of elba"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel calife abbasside a fondé Bagdad au VIIIe siècle ?",
+      "answer": "Al-Mansour",
+      "acceptedAnswers": [
+        "al mansour",
+        "mansour",
+        "al mansur"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel explorateur vénitien a voyagé en Chine au XIIIe siècle et décrit sa cour dans un célèbre récit ?",
+      "answer": "Marco Polo",
+      "acceptedAnswers": [
+        "marco polo",
+        "polo",
+        "marco"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel pays a remporté la guerre des Boers au début du XXe siècle ?",
+      "answer": "Royaume-Uni",
+      "acceptedAnswers": [
+        "royaume uni",
+        "angleterre",
+        "grande bretagne"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel pharaon de la XVIIIe dynastie a tenté d'imposer le monothéisme en Égypte ?",
+      "answer": "Akhénaton",
+      "acceptedAnswers": [
+        "akhenaton",
+        "akhenaten",
+        "amenhotep iv"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel nom portait la capitale de l'empire inca ?",
+      "answer": "Cusco",
+      "acceptedAnswers": [
+        "cusco",
+        "cuzco",
+        "qosqo"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel peintre hollandais du XVIIe siècle est l'auteur de La Ronde de nuit ?",
+      "answer": "Rembrandt",
+      "acceptedAnswers": [
+        "rembrandt",
+        "rembrandt van rijn",
+        "van rijn"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel empire a été fondé par Tamerlan à la fin du XIVe siècle avec Samarcande pour capitale ?",
+      "answer": "Timouride",
+      "acceptedAnswers": [
+        "timouride",
+        "timuride",
+        "empire timouride"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel accord secret de 1916 a partagé le Moyen-Orient entre la France et le Royaume-Uni ?",
+      "answer": "Sykes-Picot",
+      "acceptedAnswers": [
+        "sykes picot",
+        "accord sykes picot",
+        "sykes-picot"
+      ],
+      "difficulty": "hard"
+    }
+  ],
+  "quizgeographie": [
+    {
+      "text": "Quelle est la capitale de la France ?",
+      "answer": "paris",
+      "acceptedAnswers": [
+        "paris"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale du Royaume-Uni ?",
+      "answer": "londres",
+      "acceptedAnswers": [
+        "londres",
+        "london"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale du Portugal ?",
+      "answer": "lisbonne",
+      "acceptedAnswers": [
+        "lisbonne",
+        "lisboa"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale de la Grèce ?",
+      "answer": "athenes",
+      "acceptedAnswers": [
+        "athenes",
+        "athènes",
+        "athens"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale des États-Unis ?",
+      "answer": "washington",
+      "acceptedAnswers": [
+        "washington",
+        "washington dc",
+        "washington d.c."
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale du Japon ?",
+      "answer": "tokyo",
+      "acceptedAnswers": [
+        "tokyo",
+        "tokio"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale de la Chine ?",
+      "answer": "pekin",
+      "acceptedAnswers": [
+        "pekin",
+        "pékin",
+        "beijing"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale de la Russie ?",
+      "answer": "moscou",
+      "acceptedAnswers": [
+        "moscou",
+        "moscow"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale de l'Égypte ?",
+      "answer": "le caire",
+      "acceptedAnswers": [
+        "le caire",
+        "caire",
+        "cairo"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale du Maroc ?",
+      "answer": "rabat",
+      "acceptedAnswers": [
+        "rabat"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale du Mexique ?",
+      "answer": "mexico",
+      "acceptedAnswers": [
+        "mexico",
+        "mexico city",
+        "ciudad de mexico"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Sur quel continent se trouve l'Égypte ?",
+      "answer": "afrique",
+      "acceptedAnswers": [
+        "afrique",
+        "africa"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Sur quel continent se trouve le Brésil ?",
+      "answer": "amerique du sud",
+      "acceptedAnswers": [
+        "amerique du sud",
+        "amérique du sud",
+        "amerique sud",
+        "sud amerique"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Sur quel continent se trouve la Chine ?",
+      "answer": "asie",
+      "acceptedAnswers": [
+        "asie",
+        "asia"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Sur quel continent se trouve l'Australie ?",
+      "answer": "oceanie",
+      "acceptedAnswers": [
+        "oceanie",
+        "océanie",
+        "australie"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le plus long fleuve du monde ?",
+      "answer": "nil",
+      "acceptedAnswers": [
+        "nil",
+        "le nil",
+        "nile"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel fleuve traverse Paris ?",
+      "answer": "seine",
+      "acceptedAnswers": [
+        "seine",
+        "la seine"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel fleuve traverse l'Égypte et se jette dans la Méditerranée ?",
+      "answer": "nil",
+      "acceptedAnswers": [
+        "nil",
+        "le nil",
+        "nile"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le plus grand désert du monde ?",
+      "answer": "sahara",
+      "acceptedAnswers": [
+        "sahara",
+        "le sahara"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la plus haute montagne du monde ?",
+      "answer": "everest",
+      "acceptedAnswers": [
+        "everest",
+        "mont everest",
+        "l everest"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel pays se trouve le Colisée ?",
+      "answer": "italie",
+      "acceptedAnswers": [
+        "italie",
+        "italy"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel pays se trouve la Grande Pyramide de Gizeh ?",
+      "answer": "egypte",
+      "acceptedAnswers": [
+        "egypte",
+        "égypte",
+        "egypt"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel pays a la plus grande superficie du monde ?",
+      "answer": "russie",
+      "acceptedAnswers": [
+        "russie",
+        "russia"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle mer sépare l'Europe de l'Afrique au niveau du détroit de Gibraltar ?",
+      "answer": "mediterranee",
+      "acceptedAnswers": [
+        "mediterranee",
+        "méditerranée",
+        "mer mediterranee",
+        "mer méditerranée"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le plus grand pays d'Afrique ?",
+      "answer": "algerie",
+      "acceptedAnswers": [
+        "algerie",
+        "algérie",
+        "algeria"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel pays se trouve le mont Fuji ?",
+      "answer": "japon",
+      "acceptedAnswers": [
+        "japon",
+        "japan"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel fleuve est le plus long d'Europe ?",
+      "answer": "volga",
+      "acceptedAnswers": [
+        "volga",
+        "la volga"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel pays se trouve le fleuve Amazone ?",
+      "answer": "bresil",
+      "acceptedAnswers": [
+        "bresil",
+        "brésil",
+        "brazil"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale de la Belgique ?",
+      "answer": "bruxelles",
+      "acceptedAnswers": [
+        "bruxelles",
+        "brussels",
+        "brussel"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la capitale de l'Inde ?",
+      "answer": "new delhi",
+      "acceptedAnswers": [
+        "new delhi",
+        "delhi"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale des Pays-Bas ?",
+      "answer": "amsterdam",
+      "acceptedAnswers": [
+        "amsterdam"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de la Suisse ?",
+      "answer": "berne",
+      "acceptedAnswers": [
+        "berne",
+        "bern"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de la Turquie ?",
+      "answer": "ankara",
+      "acceptedAnswers": [
+        "ankara"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de la Suède ?",
+      "answer": "stockholm",
+      "acceptedAnswers": [
+        "stockholm"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de la Pologne ?",
+      "answer": "varsovie",
+      "acceptedAnswers": [
+        "varsovie",
+        "warsaw"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de l'Ukraine ?",
+      "answer": "kiev",
+      "acceptedAnswers": [
+        "kiev",
+        "kyiv"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de la Corée du Sud ?",
+      "answer": "seoul",
+      "acceptedAnswers": [
+        "seoul",
+        "séoul"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de l'Afrique du Sud ?",
+      "answer": "pretoria",
+      "acceptedAnswers": [
+        "pretoria",
+        "le cap",
+        "cape town"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale du Kenya ?",
+      "answer": "nairobi",
+      "acceptedAnswers": [
+        "nairobi"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de la Norvège ?",
+      "answer": "oslo",
+      "acceptedAnswers": [
+        "oslo"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale du Danemark ?",
+      "answer": "copenhague",
+      "acceptedAnswers": [
+        "copenhague",
+        "copenhagen"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale de la Finlande ?",
+      "answer": "helsinki",
+      "acceptedAnswers": [
+        "helsinki"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel fleuve traverse l'Allemagne et se jette dans la mer du Nord ?",
+      "answer": "rhin",
+      "acceptedAnswers": [
+        "rhin",
+        "rhine"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel fleuve traverse Rome ?",
+      "answer": "tibre",
+      "acceptedAnswers": [
+        "tibre",
+        "tevere"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel fleuve traverse Budapest ?",
+      "answer": "danube",
+      "acceptedAnswers": [
+        "danube"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel fleuve traverse Londres ?",
+      "answer": "tamise",
+      "acceptedAnswers": [
+        "tamise",
+        "thames"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le plus long fleuve d'Afrique ?",
+      "answer": "nil",
+      "acceptedAnswers": [
+        "nil",
+        "nile"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel océan sépare l'Europe de l'Amérique ?",
+      "answer": "atlantique",
+      "acceptedAnswers": [
+        "atlantique",
+        "ocean atlantique",
+        "atlantique nord"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le plus petit océan du monde ?",
+      "answer": "arctique",
+      "acceptedAnswers": [
+        "arctique",
+        "ocean arctique",
+        "glacial arctique"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quelle chaîne de montagnes se trouve l'Everest ?",
+      "answer": "himalaya",
+      "acceptedAnswers": [
+        "himalaya",
+        "himalayas"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle chaîne de montagnes sépare l'Europe de l'Asie en Russie ?",
+      "answer": "oural",
+      "acceptedAnswers": [
+        "oural",
+        "monts oural"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle chaîne de montagnes sépare la France de l'Espagne ?",
+      "answer": "pyrenees",
+      "acceptedAnswers": [
+        "pyrenees",
+        "pyrénées"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le plus grand lac du monde ?",
+      "answer": "mer caspienne",
+      "acceptedAnswers": [
+        "mer caspienne",
+        "caspienne",
+        "caspian"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel pays se trouve le lac Titicaca ?",
+      "answer": "perou",
+      "acceptedAnswers": [
+        "perou",
+        "pérou",
+        "bolivie"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le plus grand pays d'Amérique du Sud ?",
+      "answer": "bresil",
+      "acceptedAnswers": [
+        "bresil",
+        "brésil",
+        "brazil"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel pays se trouve la ville de Sydney ?",
+      "answer": "australie",
+      "acceptedAnswers": [
+        "australie",
+        "australia"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel pays se trouve Machu Picchu ?",
+      "answer": "perou",
+      "acceptedAnswers": [
+        "perou",
+        "pérou"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel pays se trouve l'Acropole d'Athènes ?",
+      "answer": "grece",
+      "acceptedAnswers": [
+        "grece",
+        "grèce",
+        "greece"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel détroit sépare l'Asie de l'Amérique ?",
+      "answer": "bering",
+      "acceptedAnswers": [
+        "bering",
+        "detroit de bering"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle île est à la fois un pays et un continent ?",
+      "answer": "australie",
+      "acceptedAnswers": [
+        "australie",
+        "australia"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel pays se trouve la Tour de Pise ?",
+      "answer": "italie",
+      "acceptedAnswers": [
+        "italie",
+        "italy"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pays possède le plus grand nombre d'îles au monde ?",
+      "answer": "suede",
+      "acceptedAnswers": [
+        "suede",
+        "suède",
+        "sweden"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la capitale du Kazakhstan ?",
+      "answer": "astana",
+      "acceptedAnswers": [
+        "astana",
+        "nur-sultan",
+        "noursoultan"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel fleuve traverse Bagdad ?",
+      "answer": "tigre",
+      "acceptedAnswers": [
+        "tigre",
+        "le tigre",
+        "tigris"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle est la capitale de la Mongolie ?",
+      "answer": "oulan-bator",
+      "acceptedAnswers": [
+        "oulan-bator",
+        "ulaanbaatar",
+        "oulan bator"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quel pays se trouve le désert de Gobi ?",
+      "answer": "mongolie",
+      "acceptedAnswers": [
+        "mongolie",
+        "chine",
+        "mongolie et chine"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le plus haut sommet d'Afrique ?",
+      "answer": "kilimandjaro",
+      "acceptedAnswers": [
+        "kilimandjaro",
+        "kilimanjaro",
+        "mont kilimandjaro"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle est la capitale de la Bolivie siège du gouvernement ?",
+      "answer": "la paz",
+      "acceptedAnswers": [
+        "la paz",
+        "lapaz",
+        "la paz"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Par combien de pays le fleuve Danube passe-t-il ?",
+      "answer": "10",
+      "acceptedAnswers": [
+        "10",
+        "dix"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel pays possède la plus longue frontière terrestre du monde ?",
+      "answer": "chine",
+      "acceptedAnswers": [
+        "chine",
+        "china",
+        "la chine"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle est la capitale de l'Érythrée ?",
+      "answer": "asmara",
+      "acceptedAnswers": [
+        "asmara",
+        "asmera",
+        "asmara"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel fleuve se jette dans le golfe du Bengale après avoir traversé le Bangladesh ?",
+      "answer": "brahmapoutre",
+      "acceptedAnswers": [
+        "brahmapoutre",
+        "brahmaputra",
+        "brahmapoutra"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle chaîne de montagnes traverse le Maroc, l'Algérie et la Tunisie ?",
+      "answer": "atlas",
+      "acceptedAnswers": [
+        "atlas",
+        "l'atlas",
+        "massif de l'atlas"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle est la capitale du Myanmar ?",
+      "answer": "naypyidaw",
+      "acceptedAnswers": [
+        "naypyidaw",
+        "naypyitaw",
+        "nay pyi taw"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le plus petit pays d'Amérique du Sud ?",
+      "answer": "suriname",
+      "acceptedAnswers": [
+        "suriname",
+        "le suriname",
+        "surinam"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel détroit sépare l'Espagne du Maroc ?",
+      "answer": "gibraltar",
+      "acceptedAnswers": [
+        "gibraltar",
+        "detroit de gibraltar",
+        "detroit de gibraltar"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle est la capitale du Bhoutan ?",
+      "answer": "thimphou",
+      "acceptedAnswers": [
+        "thimphou",
+        "thimphu",
+        "thimbu"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quel pays se trouve le volcan Etna ?",
+      "answer": "italie",
+      "acceptedAnswers": [
+        "italie",
+        "sicile",
+        "l'italie"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel pays d'Asie du Sud-Est est un archipel de plus de 7 000 îles ?",
+      "answer": "philippines",
+      "acceptedAnswers": [
+        "philippines",
+        "les philippines",
+        "filipines"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle mer intérieure est bordée par la Russie, le Kazakhstan, l'Azerbaïdjan, l'Iran et le Turkménistan ?",
+      "answer": "caspienne",
+      "acceptedAnswers": [
+        "caspienne",
+        "mer caspienne",
+        "mer caspiene"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle est la capitale du Kirghizstan ?",
+      "answer": "bichkek",
+      "acceptedAnswers": [
+        "bichkek",
+        "bishkek",
+        "bichkeck"
+      ],
+      "difficulty": "hard"
+    }
+  ],
+  "quizsport": [
+    {
+      "text": "Combien de joueurs y a-t-il dans une équipe de basket-ball sur le terrain ?",
+      "answer": "5",
+      "acceptedAnswers": [
+        "5",
+        "cinq"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel sport se joue avec un ballon ovale ?",
+      "answer": "rugby",
+      "acceptedAnswers": [
+        "rugby"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quelle ville ont eu lieu les Jeux Olympiques d'été de 2024 ?",
+      "answer": "paris",
+      "acceptedAnswers": [
+        "paris"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de sets faut-il gagner pour remporter un match de tennis en Grand Chelem chez les hommes ?",
+      "answer": "3",
+      "acceptedAnswers": [
+        "3",
+        "trois"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel pays a inventé le judo ?",
+      "answer": "japon",
+      "acceptedAnswers": [
+        "japon",
+        "japan"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de joueurs y a-t-il dans une équipe de volleyball sur le terrain ?",
+      "answer": "6",
+      "acceptedAnswers": [
+        "6",
+        "six"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel sport marque-t-on un essai ?",
+      "answer": "rugby",
+      "acceptedAnswers": [
+        "rugby"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel sport pratique-t-on sur un ring ?",
+      "answer": "boxe",
+      "acceptedAnswers": [
+        "boxe",
+        "boxing"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien y a-t-il de joueurs dans une équipe de handball sur le terrain ?",
+      "answer": "7",
+      "acceptedAnswers": [
+        "7",
+        "sept"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel sport utilise-t-on un palet ?",
+      "answer": "hockey",
+      "acceptedAnswers": [
+        "hockey",
+        "hockey sur glace"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle couleur sont les anneaux olympiques réunis sur fond blanc ?",
+      "answer": "5 couleurs",
+      "acceptedAnswers": [
+        "5 couleurs",
+        "cinq couleurs",
+        "5"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Sur quelle surface se joue le tournoi de Roland-Garros ?",
+      "answer": "terre battue",
+      "acceptedAnswers": [
+        "terre battue",
+        "terre"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel sport se pratique dans une piscine avec deux équipes qui se lancent un ballon ?",
+      "answer": "water-polo",
+      "acceptedAnswers": [
+        "water-polo",
+        "water polo",
+        "waterpolo"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de baseball sur le terrain ?",
+      "answer": "9",
+      "acceptedAnswers": [
+        "9",
+        "neuf"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel sport marque-t-on des buts en lançant un ballon dans un filet avec la main ?",
+      "answer": "handball",
+      "acceptedAnswers": [
+        "handball",
+        "hand"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de temps dure un match de football (temps réglementaire) ?",
+      "answer": "90 minutes",
+      "acceptedAnswers": [
+        "90 minutes",
+        "90 min",
+        "90"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel sport se pratique sur un terrain appelé 'court' avec une raquette et une balle jaune ?",
+      "answer": "tennis",
+      "acceptedAnswers": [
+        "tennis"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de tours compte le Tour de France cycliste ?",
+      "answer": "21",
+      "acceptedAnswers": [
+        "21",
+        "vingt et un"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quelle discipline olympique saute-t-on dans l'eau depuis une hauteur ?",
+      "answer": "plongeon",
+      "acceptedAnswers": [
+        "plongeon",
+        "plongeons"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le sport national du Canada ?",
+      "answer": "hockey",
+      "acceptedAnswers": [
+        "hockey",
+        "hockey sur glace"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de joueurs y a-t-il par équipe dans un match de rugby à XV ?",
+      "answer": "15",
+      "acceptedAnswers": [
+        "15",
+        "quinze"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel sport utilise-t-on un arc et des flèches ?",
+      "answer": "tir a l arc",
+      "acceptedAnswers": [
+        "tir a l arc",
+        "tir à l'arc",
+        "archerie",
+        "archery"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel sport se joue sur un terrain avec un filet, et les joueurs ne doivent pas laisser le ballon toucher le sol ?",
+      "answer": "volleyball",
+      "acceptedAnswers": [
+        "volleyball",
+        "volley-ball",
+        "volley"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel sport olympique fait-on de la lutte debout appelée 'greco-romaine' ?",
+      "answer": "lutte",
+      "acceptedAnswers": [
+        "lutte",
+        "wrestling"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle ville a accueilli les premiers Jeux Olympiques modernes en 1896 ?",
+      "answer": "athenes",
+      "acceptedAnswers": [
+        "athenes",
+        "athènes",
+        "athens"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel sport marque-t-on un 'strike' ?",
+      "answer": "bowling",
+      "acceptedAnswers": [
+        "bowling"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de cricket sur le terrain ?",
+      "answer": "11",
+      "acceptedAnswers": [
+        "11",
+        "onze"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel sport se pratique sur une piste avec des patins à glace ?",
+      "answer": "patinage",
+      "acceptedAnswers": [
+        "patinage",
+        "patinage sur glace"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel sport olympique tire-t-on au pistolet ou au fusil sur des cibles ?",
+      "answer": "tir sportif",
+      "acceptedAnswers": [
+        "tir sportif",
+        "tir",
+        "shooting"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de points vaut un panier marqué derrière la ligne à trois points au basket ?",
+      "answer": "3",
+      "acceptedAnswers": [
+        "3",
+        "trois"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel sport pratique-t-on sur un terrain appelé 'dojo' ?",
+      "answer": "judo",
+      "acceptedAnswers": [
+        "judo",
+        "arts martiaux"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel sport les équipes s'affrontent sur une patinoire avec des crosses ?",
+      "answer": "hockey sur glace",
+      "acceptedAnswers": [
+        "hockey sur glace",
+        "hockey"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de sets composent un match de volley-ball pour être remporté ?",
+      "answer": "3",
+      "acceptedAnswers": [
+        "3",
+        "trois"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel pays a remporté le plus de médailles d'or aux Jeux Olympiques d'été 2024 ?",
+      "answer": "etats-unis",
+      "acceptedAnswers": [
+        "etats-unis",
+        "usa",
+        "amerique"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel sport effectue-t-on un 'smash' ?",
+      "answer": "badminton",
+      "acceptedAnswers": [
+        "badminton",
+        "tennis",
+        "volleyball"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de joueurs une équipe de football américain aligne-t-elle sur le terrain ?",
+      "answer": "11",
+      "acceptedAnswers": [
+        "11",
+        "onze"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel sport se joue avec un ballon et des paniers suspendus en hauteur ?",
+      "answer": "basket",
+      "acceptedAnswers": [
+        "basket",
+        "basket-ball",
+        "basketball"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de disciplines composent le triathlon olympique ?",
+      "answer": "3",
+      "acceptedAnswers": [
+        "3",
+        "trois"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de polo sur le terrain ?",
+      "answer": "4",
+      "acceptedAnswers": [
+        "4",
+        "quatre"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport olympique effectue-t-on un 'plongeon' en nage synchronisée ?",
+      "answer": "natation synchronisee",
+      "acceptedAnswers": [
+        "natation synchronisee",
+        "nage synchronisee",
+        "synchro"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de mètres mesure une piscine olympique ?",
+      "answer": "50",
+      "acceptedAnswers": [
+        "50",
+        "cinquante",
+        "50m"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport marque-t-on un 'touchdown' ?",
+      "answer": "football americain",
+      "acceptedAnswers": [
+        "football americain",
+        "american football",
+        "foot americain"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de points vaut un essai au rugby à XV ?",
+      "answer": "5",
+      "acceptedAnswers": [
+        "5",
+        "cinq"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la distance officielle d'un marathon ?",
+      "answer": "42,195 km",
+      "acceptedAnswers": [
+        "42,195 km",
+        "42 km",
+        "42195",
+        "42.195"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quelle ville se trouve le stade de Wembley ?",
+      "answer": "londres",
+      "acceptedAnswers": [
+        "londres",
+        "london",
+        "wembley"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pays a remporté le plus de Coupes du Monde de football ?",
+      "answer": "bresil",
+      "acceptedAnswers": [
+        "bresil",
+        "brésil",
+        "brazil"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de water-polo dans l'eau ?",
+      "answer": "7",
+      "acceptedAnswers": [
+        "7",
+        "sept"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport utilise-t-on une crosse et une balle blanche trouée ?",
+      "answer": "golf",
+      "acceptedAnswers": [
+        "golf"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Sur quelle surface se joue le tournoi de Wimbledon ?",
+      "answer": "gazon",
+      "acceptedAnswers": [
+        "gazon",
+        "herbe",
+        "grass"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de coureurs composent une équipe dans un relais 4x100 mètres ?",
+      "answer": "4",
+      "acceptedAnswers": [
+        "4",
+        "quatre"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel sport se pratique sur un terrain appelé 'piste' avec des bâtons et une rondelle ?",
+      "answer": "hockey sur glace",
+      "acceptedAnswers": [
+        "hockey sur glace",
+        "hockey",
+        "ice hockey"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport olympique individuel s'affronte-t-on avec une épée fine appelée fleuret ?",
+      "answer": "escrime",
+      "acceptedAnswers": [
+        "escrime",
+        "fencing"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de rugby à VII sur le terrain ?",
+      "answer": "7",
+      "acceptedAnswers": [
+        "7",
+        "sept"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pays organise le tournoi des Six Nations en dehors de l'Europe ?",
+      "answer": "aucun",
+      "acceptedAnswers": [
+        "aucun",
+        "personne",
+        "nul"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport olympique tire-t-on à l'arc sur une cible à 70 mètres ?",
+      "answer": "tir a l arc",
+      "acceptedAnswers": [
+        "tir a l arc",
+        "tir a l'arc",
+        "archerie",
+        "arc"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de jours dure le Tour de France en général ?",
+      "answer": "23",
+      "acceptedAnswers": [
+        "23",
+        "vingt-trois",
+        "vingt trois"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle nation a inventé le basketball ?",
+      "answer": "etats-unis",
+      "acceptedAnswers": [
+        "etats-unis",
+        "etats unis",
+        "usa",
+        "amerique"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport olympique fait-on des figures sur glace en musique ?",
+      "answer": "patinage artistique",
+      "acceptedAnswers": [
+        "patinage artistique",
+        "patinage",
+        "figure skating"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de fautes personnelles permettent-elles d'être exclu en NBA ?",
+      "answer": "6",
+      "acceptedAnswers": [
+        "6",
+        "six"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport pratique-t-on le 'crawl' ?",
+      "answer": "natation",
+      "acceptedAnswers": [
+        "natation",
+        "nage",
+        "swimming"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pays a gagné la première Coupe du Monde de football en 1930 ?",
+      "answer": "uruguay",
+      "acceptedAnswers": [
+        "uruguay"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de points marque-t-on avec un penalty transformé au rugby ?",
+      "answer": "3",
+      "acceptedAnswers": [
+        "3",
+        "trois"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport olympique s'élance-t-on d'un tremplin à skis ?",
+      "answer": "saut a ski",
+      "acceptedAnswers": [
+        "saut a ski",
+        "ski jumping",
+        "saut"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de sets au maximum peut durer un match de tennis en Grand Chelem chez les femmes ?",
+      "answer": "3",
+      "acceptedAnswers": [
+        "3",
+        "trois"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport olympique d'hiver descend-on une piste glacée en luge ?",
+      "answer": "luge",
+      "acceptedAnswers": [
+        "luge"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de softball sur le terrain ?",
+      "answer": "9",
+      "acceptedAnswers": [
+        "9",
+        "neuf"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle ville a accueilli les Jeux Olympiques d'été de 2000 ?",
+      "answer": "sydney",
+      "acceptedAnswers": [
+        "sydney",
+        "sydnei"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport olympique combine-t-on ski de fond et tir à la carabine ?",
+      "answer": "biathlon",
+      "acceptedAnswers": [
+        "biathlon"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de disciplines composent le décathlon ?",
+      "answer": "10",
+      "acceptedAnswers": [
+        "10",
+        "dix"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport marque-t-on un 'ace' en envoyant la balle directement dans le carré adverse ?",
+      "answer": "tennis",
+      "acceptedAnswers": [
+        "tennis"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de lacrosse sur le terrain ?",
+      "answer": "10",
+      "acceptedAnswers": [
+        "10",
+        "dix"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle ville a accueilli les Jeux Olympiques d'été de 1992 ?",
+      "answer": "barcelone",
+      "acceptedAnswers": [
+        "barcelone",
+        "barcelona"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport combat-on en frappant uniquement avec les poings ?",
+      "answer": "boxe",
+      "acceptedAnswers": [
+        "boxe",
+        "boxing",
+        "boxe anglaise"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de temps dure une période au hockey sur glace ?",
+      "answer": "20 minutes",
+      "acceptedAnswers": [
+        "20 minutes",
+        "20 mn",
+        "20",
+        "vingt minutes"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport olympique nage-t-on sous l'eau avec des palmes et un masque ?",
+      "answer": "nage avec palmes",
+      "acceptedAnswers": [
+        "nage avec palmes",
+        "plongee",
+        "finswimming"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel pays a remporté le plus de médailles aux Jeux Olympiques d'hiver de l'histoire ?",
+      "answer": "norvege",
+      "acceptedAnswers": [
+        "norvege",
+        "norvège",
+        "norway"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel sport olympique s'affronte-t-on sur un tatami en tentant de projeter l'adversaire ?",
+      "answer": "judo",
+      "acceptedAnswers": [
+        "judo"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de futsal sur le terrain ?",
+      "answer": "5",
+      "acceptedAnswers": [
+        "5",
+        "cinq"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de médailles d'or Michael Phelps a-t-il remportées en carrière olympique ?",
+      "answer": "23",
+      "acceptedAnswers": [
+        "23",
+        "vingt-trois",
+        "23 médailles"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quel pays se trouve le stade Maracanã ?",
+      "answer": "brésil",
+      "acceptedAnswers": [
+        "brésil",
+        "bresil",
+        "brazil"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le record du monde du 100 mètres masculin en secondes ?",
+      "answer": "9.58",
+      "acceptedAnswers": [
+        "9.58",
+        "9,58",
+        "neuf virgule cinquante-huit"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Combien de Grand Chelem Roger Federer a-t-il remportés en carrière ?",
+      "answer": "20",
+      "acceptedAnswers": [
+        "20",
+        "vingt",
+        "20 titres"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "En quelle année Pelé a-t-il remporté sa première Coupe du Monde ?",
+      "answer": "1958",
+      "acceptedAnswers": [
+        "1958",
+        "cinquante-huit"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel pays a remporté le plus de titres de Coupe Davis en tennis ?",
+      "answer": "états-unis",
+      "acceptedAnswers": [
+        "états-unis",
+        "etats-unis",
+        "usa",
+        "amérique"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Combien de fois la Nouvelle-Zélande a-t-elle remporté la Coupe du Monde de rugby ?",
+      "answer": "3",
+      "acceptedAnswers": [
+        "3",
+        "trois"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quel sport appelle-t-on 'épaulé-jeté' l'une des deux disciplines de compétition ?",
+      "answer": "haltérophilie",
+      "acceptedAnswers": [
+        "haltérophilie",
+        "halterophilie",
+        "haltero"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle nation a remporté le plus de titres en Ligue des Champions de football ?",
+      "answer": "real madrid",
+      "acceptedAnswers": [
+        "real madrid",
+        "madrid",
+        "le real"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Combien de fois Usain Bolt a-t-il été champion olympique sur 100 mètres ?",
+      "answer": "3",
+      "acceptedAnswers": [
+        "3",
+        "trois"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "En quelle année le basketball a-t-il été introduit aux Jeux Olympiques ?",
+      "answer": "1936",
+      "acceptedAnswers": [
+        "1936",
+        "trente-six"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel pays a inventé le sport du curling ?",
+      "answer": "écosse",
+      "acceptedAnswers": [
+        "écosse",
+        "ecosse",
+        "scotland"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Combien de joueurs composent une équipe de floorball sur le terrain ?",
+      "answer": "5",
+      "acceptedAnswers": [
+        "5",
+        "cinq"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel pays a organisé les premiers Jeux Olympiques d'hiver en 1924 ?",
+      "answer": "france",
+      "acceptedAnswers": [
+        "france",
+        "chamonix",
+        "french"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Combien de disciplines composent le pentathlon moderne ?",
+      "answer": "5",
+      "acceptedAnswers": [
+        "5",
+        "cinq"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel nageur détient le record du monde du 400 mètres nage libre ?",
+      "answer": "sun yang",
+      "acceptedAnswers": [
+        "sun yang",
+        "yang",
+        "sun"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quel sport olympique utilise-t-on un sabre, un fleuret ou une épée ?",
+      "answer": "escrime",
+      "acceptedAnswers": [
+        "escrime",
+        "fencing"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Combien de tours compte le parcours officiel de golf en compétition internationale ?",
+      "answer": "18",
+      "acceptedAnswers": [
+        "18",
+        "dix-huit",
+        "18 trous"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel pays a gagné le plus de médailles d'or en athlétisme aux JO de l'histoire ?",
+      "answer": "états-unis",
+      "acceptedAnswers": [
+        "états-unis",
+        "etats-unis",
+        "usa"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Combien de points vaut un but marqué en prolongation au hockey sur glace en NHL ?",
+      "answer": "1",
+      "acceptedAnswers": [
+        "1",
+        "un",
+        "un point"
+      ],
+      "difficulty": "hard"
+    }
+  ],
+  "quizsciences": [
+    {
+      "text": "Quelle est la planète la plus proche du Soleil ?",
+      "answer": "mercure",
+      "acceptedAnswers": [
+        "mercure",
+        "mercure"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de dents a un adulte (sans les dents de sagesse) ?",
+      "answer": "28",
+      "acceptedAnswers": [
+        "28",
+        "vingt-huit",
+        "vingt huit"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la formule chimique de l'eau ?",
+      "answer": "h2o",
+      "acceptedAnswers": [
+        "h2o",
+        "h₂o"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel organe pompe le sang dans le corps humain ?",
+      "answer": "coeur",
+      "acceptedAnswers": [
+        "coeur",
+        "cœur",
+        "le coeur"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de planètes y a-t-il dans le système solaire ?",
+      "answer": "8",
+      "acceptedAnswers": [
+        "8",
+        "huit"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien font 7 multiplié par 8 ?",
+      "answer": "56",
+      "acceptedAnswers": [
+        "56",
+        "cinquante-six",
+        "cinquante six"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment appelle-t-on les êtres vivants qui fabriquent leur propre nourriture grâce au soleil ?",
+      "answer": "autotrophes",
+      "acceptedAnswers": [
+        "autotrophes",
+        "producteurs",
+        "plantes"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le plus grand organe du corps humain ?",
+      "answer": "peau",
+      "acceptedAnswers": [
+        "peau",
+        "la peau"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel astre éclaire la Terre pendant la nuit ?",
+      "answer": "lune",
+      "acceptedAnswers": [
+        "lune",
+        "la lune"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelle le squelette des insectes, situé à l'extérieur ?",
+      "answer": "exosquelette",
+      "acceptedAnswers": [
+        "exosquelette",
+        "squelette externe",
+        "carapace"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de pattes a une araignée ?",
+      "answer": "8",
+      "acceptedAnswers": [
+        "8",
+        "huit"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel gaz compose la majeure partie de l'air que l'on respire ?",
+      "answer": "azote",
+      "acceptedAnswers": [
+        "azote",
+        "n2",
+        "diazote"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le point de fusion de l'eau à pression normale, en degrés Celsius ?",
+      "answer": "0",
+      "acceptedAnswers": [
+        "0",
+        "zero",
+        "0 degre"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment appelle-t-on la transformation d'un liquide en gaz ?",
+      "answer": "evaporation",
+      "acceptedAnswers": [
+        "evaporation",
+        "évaporation",
+        "vaporisation"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de chromosomes a une cellule humaine normale ?",
+      "answer": "46",
+      "acceptedAnswers": [
+        "46",
+        "quarante-six",
+        "quarante six"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le symbole chimique de l'oxygène ?",
+      "answer": "o",
+      "acceptedAnswers": [
+        "o",
+        "O"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de degrés a un angle droit ?",
+      "answer": "90",
+      "acceptedAnswers": [
+        "90",
+        "quatre-vingt-dix",
+        "90 degres"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel organe filtre le sang dans le corps humain ?",
+      "answer": "reins",
+      "acceptedAnswers": [
+        "reins",
+        "rein",
+        "les reins"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle est la planète la plus grande du système solaire ?",
+      "answer": "jupiter",
+      "acceptedAnswers": [
+        "jupiter"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de valves a le cœur humain ?",
+      "answer": "4",
+      "acceptedAnswers": [
+        "4",
+        "quatre"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment appelle-t-on la cellule reproductrice mâle chez l'être humain ?",
+      "answer": "spermatozoide",
+      "acceptedAnswers": [
+        "spermatozoide",
+        "spermatozoïde",
+        "spermatozoides"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le résultat de la racine carrée de 144 ?",
+      "answer": "12",
+      "acceptedAnswers": [
+        "12",
+        "douze"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le nom de la force qui attire les objets vers le sol ?",
+      "answer": "gravite",
+      "acceptedAnswers": [
+        "gravite",
+        "gravité",
+        "pesanteur",
+        "gravitation"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de couleurs compose l'arc-en-ciel ?",
+      "answer": "7",
+      "acceptedAnswers": [
+        "7",
+        "sept"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelle le processus par lequel une chenille devient un papillon ?",
+      "answer": "metamorphose",
+      "acceptedAnswers": [
+        "metamorphose",
+        "métamorphose"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le symbole chimique du carbone ?",
+      "answer": "c",
+      "acceptedAnswers": [
+        "c",
+        "C"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de litres de sang y a-t-il environ dans le corps d'un adulte ?",
+      "answer": "5",
+      "acceptedAnswers": [
+        "5",
+        "cinq",
+        "5 litres"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quelle planète possède les anneaux les plus visibles ?",
+      "answer": "saturne",
+      "acceptedAnswers": [
+        "saturne"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien vaut pi arrondi à deux décimales ?",
+      "answer": "3.14",
+      "acceptedAnswers": [
+        "3.14",
+        "3,14"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le nom du plus petit os du corps humain ?",
+      "answer": "etrier",
+      "acceptedAnswers": [
+        "etrier",
+        "étrier"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment appelle-t-on l'unité de mesure de la température dans le système international ?",
+      "answer": "kelvin",
+      "acceptedAnswers": [
+        "kelvin",
+        "k",
+        "K"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le numéro atomique de l'hydrogène ?",
+      "answer": "1",
+      "acceptedAnswers": [
+        "1",
+        "un"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de os y a-t-il dans le corps humain adulte ?",
+      "answer": "206",
+      "acceptedAnswers": [
+        "206",
+        "deux cent six"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Combien de neutrons possède un atome d'hydrogène ordinaire ?",
+      "answer": "0",
+      "acceptedAnswers": [
+        "0",
+        "zero",
+        "zéro"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la vitesse de la lumière en km/s (arrondie) ?",
+      "answer": "300000",
+      "acceptedAnswers": [
+        "300000",
+        "300 000",
+        "trois cent mille"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Comment appelle-t-on le noyau d'un atome d'hélium ?",
+      "answer": "particule alpha",
+      "acceptedAnswers": [
+        "particule alpha",
+        "particle alpha",
+        "alpha"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel gaz est produit lors de la photosynthèse ?",
+      "answer": "oxygene",
+      "acceptedAnswers": [
+        "oxygene",
+        "oxygène",
+        "O2"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de paires de chromosomes sexuels possède l'être humain ?",
+      "answer": "1",
+      "acceptedAnswers": [
+        "1",
+        "une",
+        "un"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le symbole chimique du sodium ?",
+      "answer": "na",
+      "acceptedAnswers": [
+        "na",
+        "Na",
+        "NA"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la formule chimique du dioxyde de carbone ?",
+      "answer": "co2",
+      "acceptedAnswers": [
+        "co2",
+        "CO2",
+        "Co2"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de degrés y a-t-il dans un triangle ?",
+      "answer": "180",
+      "acceptedAnswers": [
+        "180",
+        "cent quatre-vingts",
+        "180 degrés"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel organe produit l'insuline ?",
+      "answer": "pancreas",
+      "acceptedAnswers": [
+        "pancreas",
+        "pancréas",
+        "le pancreas"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Comment appelle-t-on les particules chargées négativement dans un atome ?",
+      "answer": "electrons",
+      "acceptedAnswers": [
+        "electrons",
+        "électrons",
+        "electron"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le nom de la galaxie qui contient notre système solaire ?",
+      "answer": "voie lactee",
+      "acceptedAnswers": [
+        "voie lactee",
+        "voie lactée",
+        "milky way"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le symbole chimique de l'argent ?",
+      "answer": "ag",
+      "acceptedAnswers": [
+        "ag",
+        "Ag",
+        "AG"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle partie de la cellule contient l'ADN ?",
+      "answer": "noyau",
+      "acceptedAnswers": [
+        "noyau",
+        "le noyau",
+        "nucleus"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien d'électrons peut contenir la première couche électronique ?",
+      "answer": "2",
+      "acceptedAnswers": [
+        "2",
+        "deux",
+        "2 electrons"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Comment appelle-t-on l'unité de mesure de l'intensité électrique ?",
+      "answer": "ampere",
+      "acceptedAnswers": [
+        "ampere",
+        "ampère",
+        "A"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le numéro atomique du carbone ?",
+      "answer": "6",
+      "acceptedAnswers": [
+        "6",
+        "six",
+        "Z=6"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel astre est au centre de notre système solaire ?",
+      "answer": "soleil",
+      "acceptedAnswers": [
+        "soleil",
+        "le soleil",
+        "sun"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Comment appelle-t-on la partie du cerveau qui contrôle l'équilibre ?",
+      "answer": "cervelet",
+      "acceptedAnswers": [
+        "cervelet",
+        "le cervelet",
+        "cerebellum"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le nom du processus par lequel une cellule se divise en deux ?",
+      "answer": "mitose",
+      "acceptedAnswers": [
+        "mitose",
+        "la mitose",
+        "division cellulaire"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le symbole chimique du plomb ?",
+      "answer": "pb",
+      "acceptedAnswers": [
+        "pb",
+        "Pb",
+        "PB"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de lobes a le poumon droit humain ?",
+      "answer": "3",
+      "acceptedAnswers": [
+        "3",
+        "trois",
+        "3 lobes"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est l'unité de mesure de la pression atmosphérique ?",
+      "answer": "pascal",
+      "acceptedAnswers": [
+        "pascal",
+        "Pa",
+        "pa"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Comment appelle-t-on les organismes qui se nourrissent de matière organique morte ?",
+      "answer": "decomposeurs",
+      "acceptedAnswers": [
+        "decomposeurs",
+        "décomposeurs",
+        "saprophytes"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien de litres d'air inspire-t-on en moyenne à chaque respiration au repos ?",
+      "answer": "0,5",
+      "acceptedAnswers": [
+        "0,5",
+        "0.5",
+        "un demi litre"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quelle est la formule chimique du méthane ?",
+      "answer": "ch4",
+      "acceptedAnswers": [
+        "ch4",
+        "CH4",
+        "Ch4"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Comment appelle-t-on la couche externe de la Terre ?",
+      "answer": "croute terrestre",
+      "acceptedAnswers": [
+        "croute terrestre",
+        "croûte terrestre",
+        "lithosphere"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le résultat de 2 à la puissance 10 ?",
+      "answer": "1024",
+      "acceptedAnswers": [
+        "1024",
+        "mille vingt-quatre",
+        "1 024"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Comment appelle-t-on le phénomène qui fait briller les étoiles ?",
+      "answer": "fusion nucleaire",
+      "acceptedAnswers": [
+        "fusion nucleaire",
+        "fusion nucléaire",
+        "fusion"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le nom de l'os le plus long du corps humain ?",
+      "answer": "femur",
+      "acceptedAnswers": [
+        "femur",
+        "fémur",
+        "le femur"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Combien d'atomes d'hydrogène contient une molécule d'eau ?",
+      "answer": "2",
+      "acceptedAnswers": [
+        "2",
+        "deux",
+        "2 atomes"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le nom de la force exercée par un liquide sur un objet immergé ?",
+      "answer": "poussee d'archimede",
+      "acceptedAnswers": [
+        "poussee d'archimede",
+        "poussée d'archimède",
+        "archimede"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Comment appelle-t-on un angle de 180 degrés ?",
+      "answer": "angle plat",
+      "acceptedAnswers": [
+        "angle plat",
+        "plat",
+        "angle de 180"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le nom de la planète la plus éloignée du Soleil dans notre système solaire ?",
+      "answer": "neptune",
+      "acceptedAnswers": [
+        "neptune",
+        "Neptune",
+        "la planete neptune"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Comment appelle-t-on la molécule porteuse de l'information génétique ?",
+      "answer": "adn",
+      "acceptedAnswers": [
+        "adn",
+        "ADN",
+        "DNA"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel est le nom du scientifique qui a formulé la théorie de la relativité générale ?",
+      "answer": "einstein",
+      "acceptedAnswers": [
+        "einstein",
+        "albert einstein"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom de la constante qui relie l'énergie d'un photon à sa fréquence ?",
+      "answer": "constante de planck",
+      "acceptedAnswers": [
+        "constante de planck",
+        "planck",
+        "h"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom de la particule élémentaire responsable de la masse des autres particules ?",
+      "answer": "boson de higgs",
+      "acceptedAnswers": [
+        "boson de higgs",
+        "higgs",
+        "boson higgs"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Comment appelle-t-on le phénomène par lequel un noyau atomique instable perd de l'énergie en émettant des rayonnements ?",
+      "answer": "radioactivite",
+      "acceptedAnswers": [
+        "radioactivite",
+        "radioactivité",
+        "desintegration radioactive"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom du mathématicien qui a démontré que tout entier supérieur à 2 peut s'écrire comme somme de deux nombres premiers (conjecture) ?",
+      "answer": "goldbach",
+      "acceptedAnswers": [
+        "goldbach",
+        "christian goldbach"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom de l'enzyme qui réplique l'ADN lors de la division cellulaire ?",
+      "answer": "adn polymerase",
+      "acceptedAnswers": [
+        "adn polymerase",
+        "polymerase",
+        "DNA polymerase"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Comment appelle-t-on l'unité astronomique mesurant la distance que la lumière parcourt en un an ?",
+      "answer": "annee-lumiere",
+      "acceptedAnswers": [
+        "annee-lumiere",
+        "annee lumiere",
+        "al"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom du principe stipulant qu'il est impossible de connaître simultanément la position et la quantité de mouvement d'une particule avec une précision infinie ?",
+      "answer": "principe d incertitude",
+      "acceptedAnswers": [
+        "principe d incertitude",
+        "incertitude de heisenberg",
+        "heisenberg"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quelle est la formule chimique de l'acide sulfurique ?",
+      "answer": "h2so4",
+      "acceptedAnswers": [
+        "h2so4",
+        "H2SO4"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Comment appelle-t-on le type de liaisons qui maintiennent les paires de bases dans la double hélice d'ADN ?",
+      "answer": "liaisons hydrogene",
+      "acceptedAnswers": [
+        "liaisons hydrogene",
+        "liaison hydrogene",
+        "ponts hydrogene"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom de l'effet qui décrit le décalage de fréquence d'une onde perçu par un observateur en mouvement relatif par rapport à la source ?",
+      "answer": "effet doppler",
+      "acceptedAnswers": [
+        "effet doppler",
+        "doppler",
+        "effet doppler-fizeau"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel mathématicien a inventé les logarithmes au XVIIe siècle ?",
+      "answer": "napier",
+      "acceptedAnswers": [
+        "napier",
+        "john napier",
+        "neper"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom de la loi qui relie la pression et le volume d'un gaz à température constante ?",
+      "answer": "loi de boyle-mariotte",
+      "acceptedAnswers": [
+        "loi de boyle-mariotte",
+        "boyle-mariotte",
+        "mariotte"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Comment appelle-t-on la région autour d'un trou noir d'où rien ne peut s'échapper, même la lumière ?",
+      "answer": "horizon des evenements",
+      "acceptedAnswers": [
+        "horizon des evenements",
+        "horizon evenements",
+        "horizon"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le numéro atomique de l'uranium ?",
+      "answer": "92",
+      "acceptedAnswers": [
+        "92"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Comment appelle-t-on le processus par lequel une cellule ingère des particules solides par déformation de sa membrane ?",
+      "answer": "phagocytose",
+      "acceptedAnswers": [
+        "phagocytose"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom du théorème fondamental du calcul qui relie dérivation et intégration ?",
+      "answer": "theoreme fondamental de l analyse",
+      "acceptedAnswers": [
+        "theoreme fondamental de l analyse",
+        "theoreme fondamental",
+        "newton-leibniz"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le symbole chimique du tungstène ?",
+      "answer": "w",
+      "acceptedAnswers": [
+        "w",
+        "W"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Comment appelle-t-on la branche de la physique qui étudie les propriétés de la matière à très basse température, notamment la supraconductivité ?",
+      "answer": "physique des basses temperatures",
+      "acceptedAnswers": [
+        "physique des basses temperatures",
+        "cryophysique",
+        "cryogenie"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel est le nom de la structure en forme de réseau dans la cellule eucaryote qui assure la synthèse et le transport des protéines ?",
+      "answer": "reticulum endoplasmique",
+      "acceptedAnswers": [
+        "reticulum endoplasmique",
+        "reticulum",
+        "RE"
+      ],
+      "difficulty": "hard"
+    }
+  ],
+  "quizcinema": [
+    {
+      "text": "Quel studio a produit les films Toy Story et Cars ?",
+      "answer": "pixar",
+      "acceptedAnswers": [
+        "pixar",
+        "pixar studios",
+        "studio pixar"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel film voit-on le lion Simba devenir roi ?",
+      "answer": "le roi lion",
+      "acceptedAnswers": [
+        "le roi lion",
+        "roi lion",
+        "the lion king"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel personnage dit 'Je suis ton père' dans Star Wars ?",
+      "answer": "dark vador",
+      "acceptedAnswers": [
+        "dark vador",
+        "vador",
+        "darth vader"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Frozen, quel est le prénom de la reine aux pouvoirs de glace ?",
+      "answer": "elsa",
+      "acceptedAnswers": [
+        "elsa",
+        "elsa frozen",
+        "la reine elsa"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel film raconte l'histoire d'un poisson-clown qui cherche son fils Nemo ?",
+      "answer": "le monde de nemo",
+      "acceptedAnswers": [
+        "le monde de nemo",
+        "nemo",
+        "finding nemo"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelle le cowboy jouet dans Toy Story ?",
+      "answer": "woody",
+      "acceptedAnswers": [
+        "woody",
+        "sheriff woody",
+        "cowboy woody"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel film Harry Potter entre-t-il pour la première fois à Poudlard ?",
+      "answer": "harry potter 1",
+      "acceptedAnswers": [
+        "harry potter 1",
+        "l'ecole des sorciers",
+        "harry potter a l ecole des sorciers"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel acteur joue Iron Man dans les films Marvel ?",
+      "answer": "robert downey jr",
+      "acceptedAnswers": [
+        "robert downey jr",
+        "downey",
+        "robert downey"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Shrek, de quelle couleur est l'ogre principal ?",
+      "answer": "vert",
+      "acceptedAnswers": [
+        "vert",
+        "verte",
+        "couleur verte"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel film Disney met en scène la princesse Aurore endormie par un sort ?",
+      "answer": "la belle au bois dormant",
+      "acceptedAnswers": [
+        "la belle au bois dormant",
+        "belle au bois dormant",
+        "sleeping beauty"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel film voit-on des dinosaures dans un parc d'attractions ?",
+      "answer": "jurassic park",
+      "acceptedAnswers": [
+        "jurassic park",
+        "jurassic world",
+        "parc jurassique"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelle la sorcière maléfique dans Blanche-Neige ?",
+      "answer": "la sorciere",
+      "acceptedAnswers": [
+        "la sorciere",
+        "la mechante reine",
+        "la reine"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel film raconte l'histoire d'un rat qui veut devenir cuisinier à Paris ?",
+      "answer": "ratatouille",
+      "acceptedAnswers": [
+        "ratatouille",
+        "ratatouille pixar",
+        "le rat cuisinier"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Minions, pour quelle sorte de maître les Minions veulent-ils travailler ?",
+      "answer": "un villain",
+      "acceptedAnswers": [
+        "un villain",
+        "un mechant",
+        "mechant"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel est le prénom du jeune garçon ami de l'ogre Shrek ?",
+      "answer": "artie",
+      "acceptedAnswers": [
+        "artie",
+        "le chat",
+        "donkey"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel studio de cinéma a pour logo un lion qui rugit ?",
+      "answer": "mgm",
+      "acceptedAnswers": [
+        "mgm",
+        "metro goldwyn mayer",
+        "metro-goldwyn-mayer"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel film voit-on Bambi perdre sa mère dans une forêt ?",
+      "answer": "bambi",
+      "acceptedAnswers": [
+        "bambi",
+        "bambi disney",
+        "le faon bambi"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel personnage de Disney vit sous la mer et veut devenir humaine ?",
+      "answer": "ariel",
+      "acceptedAnswers": [
+        "ariel",
+        "la petite sirene",
+        "ariel la sirene"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelle le robot principal du film WALL-E ?",
+      "answer": "wall-e",
+      "acceptedAnswers": [
+        "wall-e",
+        "walle",
+        "wall e"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Aladdin, comment s'appelle le génie de la lampe magique ?",
+      "answer": "le genie",
+      "acceptedAnswers": [
+        "le genie",
+        "genie",
+        "genius"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel acteur joue le rôle de Jack Sparrow dans Pirates des Caraïbes ?",
+      "answer": "johnny depp",
+      "acceptedAnswers": [
+        "johnny depp",
+        "depp",
+        "john depp"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans quel film un garçon découvre qu'il est un sorcier à ses 11 ans ?",
+      "answer": "harry potter",
+      "acceptedAnswers": [
+        "harry potter",
+        "harry potter 1",
+        "harry potter l ecole des sorciers"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelle la fourmi héros du film Pixar Largo Winch... non, du film 1001 Pattes ?",
+      "answer": "z",
+      "acceptedAnswers": [
+        "z",
+        "flik",
+        "la fourmi"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel film raconte la vie d'un garçon dont les jouets prennent vie quand il part ?",
+      "answer": "toy story",
+      "acceptedAnswers": [
+        "toy story",
+        "toy story 1",
+        "histoire de jouets"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Kung Fu Panda, quel animal est le héros Po ?",
+      "answer": "panda",
+      "acceptedAnswers": [
+        "panda",
+        "un panda",
+        "panda geant"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel film met en scène des ogres, un âne et un chat botté ?",
+      "answer": "shrek",
+      "acceptedAnswers": [
+        "shrek",
+        "shrek 2",
+        "shrek le film"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Le Livre de la Jungle, quel est le nom du garçon élevé par les loups ?",
+      "answer": "mowgli",
+      "acceptedAnswers": [
+        "mowgli",
+        "maugli",
+        "l enfant"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel film Disney met en scène Mulan, une jeune guerrière chinoise ?",
+      "answer": "mulan",
+      "acceptedAnswers": [
+        "mulan",
+        "mulan disney",
+        "la guerriere mulan"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelle le superhéros avec une toile d'araignée dans les films Marvel ?",
+      "answer": "spider-man",
+      "acceptedAnswers": [
+        "spider-man",
+        "spiderman",
+        "l homme araignee"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Coco, dans quel pays se déroule l'histoire principale ?",
+      "answer": "mexique",
+      "acceptedAnswers": [
+        "mexique",
+        "le mexique",
+        "mexico"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel film raconte l'histoire d'une princesse qui embrasse une grenouille ?",
+      "answer": "la princesse et la grenouille",
+      "acceptedAnswers": [
+        "la princesse et la grenouille",
+        "princesse grenouille",
+        "tiana"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Moi, Moche et Méchant, comment s'appelle le vilain qui adopte des filles ?",
+      "answer": "gru",
+      "acceptedAnswers": [
+        "gru",
+        "moi moche et mechant",
+        "mr gru"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel film Pixar met en scène des émotions comme Joie, Tristesse et Peur ?",
+      "answer": "vice-versa",
+      "acceptedAnswers": [
+        "vice-versa",
+        "vice versa",
+        "inside out"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Comment s'appelle le superhéros qui peut rétrécir dans les films Marvel ?",
+      "answer": "ant-man",
+      "acceptedAnswers": [
+        "ant-man",
+        "antman",
+        "l homme fourmi"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Encanto, dans quel pays vit la famille Madrigal ?",
+      "answer": "colombie",
+      "acceptedAnswers": [
+        "colombie",
+        "la colombie",
+        "colombia"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel studio a produit les films de la saga Marvel Avengers ?",
+      "answer": "marvel studios",
+      "acceptedAnswers": [
+        "marvel studios",
+        "marvel",
+        "disney marvel"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Raiponce, que fait la méchante pour garder Raiponce enfermée ?",
+      "answer": "elle la cache dans une tour",
+      "acceptedAnswers": [
+        "une tour",
+        "la tour",
+        "elle la garde dans une tour"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel acteur joue le rôle de Thor dans les films Marvel ?",
+      "answer": "chris hemsworth",
+      "acceptedAnswers": [
+        "chris hemsworth",
+        "hemsworth",
+        "chris"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Dans Vaiana, quel est l'autre nom du film en anglais ?",
+      "answer": "moana",
+      "acceptedAnswers": [
+        "moana",
+        "vaiana",
+        "moana disney"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel film Disney raconte l'histoire d'une jeune fille dont la citrouille se transforme en carrosse ?",
+      "answer": "cendrillon",
+      "acceptedAnswers": [
+        "cendrillon",
+        "cinderella",
+        "la pantoufle de verre"
+      ],
+      "difficulty": "easy"
+    },
+    {
+      "text": "Quel réalisateur a signé les films Pulp Fiction et Kill Bill ?",
+      "answer": "tarantino",
+      "acceptedAnswers": [
+        "tarantino",
+        "quentin tarantino",
+        "quentin"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film voit-on un homme vert géant allié des Avengers ?",
+      "answer": "hulk",
+      "acceptedAnswers": [
+        "hulk",
+        "l'incroyable hulk",
+        "incredible hulk"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de Christopher Nolan raconte l'histoire d'un homme sans mémoire à court terme ?",
+      "answer": "memento",
+      "acceptedAnswers": [
+        "memento"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel acteur joue Forrest dans le film Forrest Gump ?",
+      "answer": "tom hanks",
+      "acceptedAnswers": [
+        "tom hanks",
+        "hanks",
+        "tom"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film Leonardo DiCaprio joue un architecte de rêves ?",
+      "answer": "inception",
+      "acceptedAnswers": [
+        "inception"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de 1994 raconte la vie d'un lion qui fuit après la mort de son père ?",
+      "answer": "le roi lion",
+      "acceptedAnswers": [
+        "le roi lion",
+        "roi lion",
+        "the lion king"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel réalisateur a fait les films E.T. et Indiana Jones ?",
+      "answer": "spielberg",
+      "acceptedAnswers": [
+        "spielberg",
+        "steven spielberg",
+        "steven"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film voit-on un boxeur nommé Rocky Balboa pour la première fois ?",
+      "answer": "rocky",
+      "acceptedAnswers": [
+        "rocky",
+        "rocky 1",
+        "rocky i"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel acteur joue James Bond dans Casino Royale de 2006 ?",
+      "answer": "daniel craig",
+      "acceptedAnswers": [
+        "daniel craig",
+        "craig",
+        "daniel"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de Tim Burton raconte la vie d'un homme aux mains de ciseaux ?",
+      "answer": "edward aux mains d argent",
+      "acceptedAnswers": [
+        "edward aux mains d argent",
+        "edward scissorhands",
+        "edward"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel pays se déroule le film Parasite qui a remporté l'Oscar du meilleur film en 2020 ?",
+      "answer": "coree du sud",
+      "acceptedAnswers": [
+        "coree du sud",
+        "coree",
+        "south korea"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel acteur joue le Joker dans le film de 2019 portant ce nom ?",
+      "answer": "joaquin phoenix",
+      "acceptedAnswers": [
+        "joaquin phoenix",
+        "phoenix",
+        "joaquin"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de 1997 raconte le naufrage d'un célèbre paquebot ?",
+      "answer": "titanic",
+      "acceptedAnswers": [
+        "titanic"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel réalisateur français a réalisé Le Fabuleux Destin d'Amélie Poulain ?",
+      "answer": "jeunet",
+      "acceptedAnswers": [
+        "jeunet",
+        "jean-pierre jeunet",
+        "jean pierre jeunet"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans Gladiator, dans quelle ville se trouve le Colisée où se battent les gladiateurs ?",
+      "answer": "rome",
+      "acceptedAnswers": [
+        "rome",
+        "roma"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de science-fiction de 1977 a popularisé la saga Star Wars ?",
+      "answer": "un nouvel espoir",
+      "acceptedAnswers": [
+        "un nouvel espoir",
+        "a new hope",
+        "star wars"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel acteur joue le rôle principal dans le film Cast Away, seul sur une île déserte ?",
+      "answer": "tom hanks",
+      "acceptedAnswers": [
+        "tom hanks",
+        "hanks",
+        "tom"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film musical de 2016 met en scène Emma Stone et Ryan Gosling à Los Angeles ?",
+      "answer": "la la land",
+      "acceptedAnswers": [
+        "la la land",
+        "lalaland"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film voit-on Keanu Reeves choisir entre une pilule rouge et une pilule bleue ?",
+      "answer": "matrix",
+      "acceptedAnswers": [
+        "matrix",
+        "the matrix"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel studio hollywoodien a pour logo un homme au chapeau haut-de-forme au sommet d'une montagne étoilée ?",
+      "answer": "paramount",
+      "acceptedAnswers": [
+        "paramount",
+        "paramount pictures"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film Audrey Hepburn joue-t-elle Holly Golightly devant une bijouterie ?",
+      "answer": "breakfast at tiffany s",
+      "acceptedAnswers": [
+        "breakfast at tiffany s",
+        "breakfast at tiffanys",
+        "diamants sur canape"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel réalisateur a fait la trilogie Le Seigneur des Anneaux ?",
+      "answer": "peter jackson",
+      "acceptedAnswers": [
+        "peter jackson",
+        "jackson",
+        "peter"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film voit-on un comptable qui libère des prisonniers grâce à la musique dans une prison ?",
+      "answer": "les evades",
+      "acceptedAnswers": [
+        "les evades",
+        "the shawshank redemption",
+        "shawshank"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel acteur joue le personnage de Wolverine dans les films X-Men ?",
+      "answer": "hugh jackman",
+      "acceptedAnswers": [
+        "hugh jackman",
+        "jackman",
+        "hugh"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans Jurassic Park, quel scientifique a recréé les dinosaures à partir d'ADN ?",
+      "answer": "hammond",
+      "acceptedAnswers": [
+        "hammond",
+        "john hammond",
+        "dr hammond"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de Luc Besson de 1994 met en scène un tueur à gages et une jeune fille nommée Mathilda ?",
+      "answer": "leon",
+      "acceptedAnswers": [
+        "leon",
+        "leon le professionnel",
+        "the professional"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film raconte l'histoire vraie du capitaine Phillips kidnappé par des pirates somaliens ?",
+      "answer": "captain phillips",
+      "acceptedAnswers": [
+        "captain phillips",
+        "phillips",
+        "capitaine phillips"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel acteur français a joué dans Intouchables aux côtés de François Cluzet ?",
+      "answer": "omar sy",
+      "acceptedAnswers": [
+        "omar sy",
+        "omar",
+        "sy"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film Dustin Hoffman joue-t-il un homme qui se déguise en femme pour obtenir un rôle ?",
+      "answer": "tootsie",
+      "acceptedAnswers": [
+        "tootsie"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de 1999 de M. Night Shyamalan a pour réplique célèbre 'Je vois des gens morts' ?",
+      "answer": "sixieme sens",
+      "acceptedAnswers": [
+        "sixieme sens",
+        "le sixieme sens",
+        "the sixth sense"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film voit-on un requin blanc attaquer une station balnéaire américaine ?",
+      "answer": "les dents de la mer",
+      "acceptedAnswers": [
+        "les dents de la mer",
+        "jaws",
+        "dents de la mer"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel acteur joue Hannibal Lecter dans Le Silence des Agneaux ?",
+      "answer": "anthony hopkins",
+      "acceptedAnswers": [
+        "anthony hopkins",
+        "hopkins",
+        "anthony"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de James Cameron de 2009 se déroule sur la planète Pandora ?",
+      "answer": "avatar",
+      "acceptedAnswers": [
+        "avatar"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film voit-on Gene Kelly danser sous la pluie dans une rue de Hollywood ?",
+      "answer": "chantons sous la pluie",
+      "acceptedAnswers": [
+        "chantons sous la pluie",
+        "singin in the rain",
+        "singing in the rain"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel réalisateur espagnol a réalisé Le Labyrinthe de Pan ?",
+      "answer": "del toro",
+      "acceptedAnswers": [
+        "del toro",
+        "guillermo del toro",
+        "guillermo"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film voit-on Bruce Willis tenter de désamorcer une bombe dans un gratte-ciel ?",
+      "answer": "die hard",
+      "acceptedAnswers": [
+        "die hard",
+        "piege de cristal",
+        "diehard"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de Hayao Miyazaki raconte l'histoire d'une fillette dont les parents se transforment en cochons ?",
+      "answer": "le voyage de chihiro",
+      "acceptedAnswers": [
+        "le voyage de chihiro",
+        "spirited away",
+        "chihiro"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Dans quel film voit-on Charlize Theron jouer une impératrice rebelle dans un monde post-apocalyptique ?",
+      "answer": "mad max fury road",
+      "acceptedAnswers": [
+        "mad max fury road",
+        "fury road",
+        "mad max"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de 1972 de Francis Ford Coppola est considéré comme l'un des plus grands films de l'histoire ?",
+      "answer": "le parrain",
+      "acceptedAnswers": [
+        "le parrain",
+        "the godfather",
+        "godfather"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel acteur joue le rôle principal dans le film Philadelphia, atteint du sida dans les années 90 ?",
+      "answer": "tom hanks",
+      "acceptedAnswers": [
+        "tom hanks",
+        "hanks",
+        "tom"
+      ],
+      "difficulty": "medium"
+    },
+    {
+      "text": "Quel film de Stanley Kubrick se déroule dans un hôtel hanté enneigé ?",
+      "answer": "shining",
+      "acceptedAnswers": [
+        "shining",
+        "the shining",
+        "l'enfant lumiere",
+        "l enfant lumiere"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel acteur joue le mathématicien John Nash dans Un Homme d'Exception ?",
+      "answer": "russell crowe",
+      "acceptedAnswers": [
+        "russell crowe",
+        "crowe",
+        "russel crowe"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel réalisateur coréen a réalisé Parasite, Memories of Murder et Snowpiercer ?",
+      "answer": "bong joon-ho",
+      "acceptedAnswers": [
+        "bong joon-ho",
+        "bong joon ho",
+        "bong",
+        "joon-ho"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quel film de Darren Aronofsky une danseuse étoile bascule dans la folie ?",
+      "answer": "black swan",
+      "acceptedAnswers": [
+        "black swan",
+        "le cygne noir",
+        "cygne noir"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel film de 1950 de Billy Wilder se déroule dans les coulisses d'Hollywood avec Gloria Swanson ?",
+      "answer": "sunset boulevard",
+      "acceptedAnswers": [
+        "sunset boulevard",
+        "boulevard du crepuscule",
+        "boulevard du crépuscule"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel acteur américain joue le détective privé Jake Gittes dans Chinatown ?",
+      "answer": "jack nicholson",
+      "acceptedAnswers": [
+        "jack nicholson",
+        "nicholson",
+        "jack nickolson"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel film de 1960 d'Alfred Hitchcock contient la célèbre scène de douche ?",
+      "answer": "psychose",
+      "acceptedAnswers": [
+        "psychose",
+        "psycho",
+        "psycho hitchcock"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel réalisateur italien est connu pour la trilogie des dollars avec Clint Eastwood ?",
+      "answer": "sergio leone",
+      "acceptedAnswers": [
+        "sergio leone",
+        "leone",
+        "sergio léone"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quel film de 1979 Sigourney Weaver affronte une créature extraterrestre sur un vaisseau spatial ?",
+      "answer": "alien",
+      "acceptedAnswers": [
+        "alien",
+        "alien 1979",
+        "le huitieme passager"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel film de Wong Kar-wai de 1994 met en scène deux policiers de Hong Kong solitaires ?",
+      "answer": "chungking express",
+      "acceptedAnswers": [
+        "chungking express",
+        "chunking express",
+        "chungking"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel acteur joue le colonel Kurtz dans Apocalypse Now ?",
+      "answer": "marlon brando",
+      "acceptedAnswers": [
+        "marlon brando",
+        "brando",
+        "marlon brandeau"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel film de 1968 de Kubrick se termine par un monolithe noir et un fœtus spatial ?",
+      "answer": "2001",
+      "acceptedAnswers": [
+        "2001",
+        "2001 l'odyssee de l'espace",
+        "odyssee de l espace",
+        "2001 a space odyssey"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel réalisateur iranien a réalisé Une séparation, Palme d'Or à Berlin en 2011 ?",
+      "answer": "asghar farhadi",
+      "acceptedAnswers": [
+        "asghar farhadi",
+        "farhadi",
+        "asgar farhadi"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quel film de Joel Coen un tapis qui 'fait tenir la pièce ensemble' est volé ?",
+      "answer": "the big lebowski",
+      "acceptedAnswers": [
+        "the big lebowski",
+        "big lebowski",
+        "lebowski"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel acteur joue le tueur Anton Chigurh dans No Country for Old Men ?",
+      "answer": "javier bardem",
+      "acceptedAnswers": [
+        "javier bardem",
+        "bardem",
+        "javier bardème"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel film de Ingmar Bergman de 1957 met en scène un chevalier jouant aux échecs avec la Mort ?",
+      "answer": "le septieme sceau",
+      "acceptedAnswers": [
+        "le septieme sceau",
+        "le septième sceau",
+        "the seventh seal",
+        "septieme sceau"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel film de 1950 de Joseph L. Mankiewicz raconte les rivalités entre actrices de théâtre ?",
+      "answer": "eve",
+      "acceptedAnswers": [
+        "eve",
+        "all about eve",
+        "tout sur eve",
+        "tout sur ève"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel film de 1982 de Ridley Scott se déroule dans un Los Angeles futuriste de 2019 ?",
+      "answer": "blade runner",
+      "acceptedAnswers": [
+        "blade runner",
+        "bladerunner",
+        "blade-runner"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Quel réalisateur japonais a réalisé Rashomon et Les Sept Samouraïs ?",
+      "answer": "akira kurosawa",
+      "acceptedAnswers": [
+        "akira kurosawa",
+        "kurosawa",
+        "akira kurozawa"
+      ],
+      "difficulty": "hard"
+    },
+    {
+      "text": "Dans quel film de 1988 un enfant de 8 ans se retrouve dans le corps d'un adulte après un vœu magique ?",
+      "answer": "big",
+      "acceptedAnswers": [
+        "big",
+        "big 1988",
+        "big tom hanks"
+      ],
+      "difficulty": "hard"
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -38,7 +40,9 @@ function startGame(code) {
         question: room.gameState.questions[0],
         activePlayerId: room.gameState.activePlayerId,
         times: room.gameState.times,
-        theme: room.settings.theme
+        theme: room.settings.theme,
+        mode: room.settings.mode || 'images',
+        avatars: room.avatars || {}
     });
 
     // 2. Lancer le chronomètre de la room (si pas déjà lancé)
@@ -475,6 +479,17 @@ const allQuestions = {
 };
 
 
+// =====================================================================
+// BANQUE DE QUESTIONS — MODE QUIZ CULTURE GÉNÉRALE (chargée depuis quiz-questions.json)
+// =====================================================================
+const quizQuestions = JSON.parse(
+    fs.readFileSync(path.join(__dirname, 'quiz-questions.json'), 'utf8')
+);
+
+// Ensemble de tous les thèmes disponibles par mode
+const IMAGE_THEMES = Object.keys(allQuestions);
+const QUIZ_THEMES = Object.keys(quizQuestions);
+
 // On mélange les questions dès que le serveur s'allume
 shuffle(questions);
 
@@ -488,16 +503,16 @@ io.on('connection', (socket) => {
     console.log(`Joueur connecté : ${socket.id}`);
 
     // --- MATCHMAKING ---
-    socket.on('join-matchmaking', () => {
+    socket.on('join-matchmaking', (data) => {
         // On simule un pseudo et un elo (en attendant ton système de compte)
         socket.nickname = "Joueur #" + socket.id.substring(0, 4);
         socket.elo = 1000;
+        socket.avatarConfig = (data && data.avatar) ? data.avatar : null;
 
         matchmakingQueue.push(socket);
         console.log(`File d'attente : ${matchmakingQueue.length} joueurs`);
 
         if (matchmakingQueue.length >= 2) {
-            // On sort les deux premiers
             const p1 = matchmakingQueue.shift();
             const p2 = matchmakingQueue.shift();
 
@@ -505,26 +520,37 @@ io.on('connection', (socket) => {
             p1.join(code);
             p2.join(code);
 
-            // Choix aléatoire du thème et de celui qui commence
-            const themes = Object.keys(allQuestions);
-            const selectedTheme = themes[Math.floor(Math.random() * themes.length)];
+            // Choix aléatoire du MODE puis du thème correspondant
+            const mode = Math.random() < 0.5 ? 'images' : 'quiz';
+            let selectedTheme, selectedQuestions;
+            if (mode === 'quiz') {
+                selectedTheme = QUIZ_THEMES[Math.floor(Math.random() * QUIZ_THEMES.length)];
+                selectedQuestions = shuffle([...quizQuestions[selectedTheme]]);
+            } else {
+                selectedTheme = IMAGE_THEMES[Math.floor(Math.random() * IMAGE_THEMES.length)];
+                selectedQuestions = shuffle([...allQuestions[selectedTheme]]);
+            }
             const players = [p1.id, p2.id].sort(() => Math.random() - 0.5);
 
             rooms[code] = {
                 players: players,
-                settings: { theme: selectedTheme, timer: 45 },
+                settings: { mode, theme: selectedTheme, timer: 60 },
+                avatars: {
+                    [p1.id]: p1.avatarConfig || null,
+                    [p2.id]: p2.avatarConfig || null
+                },
                 gameState: {
-                    questions: shuffle([...allQuestions[selectedTheme]]),
+                    questions: selectedQuestions,
                     currentQuestionIndex: 0,
                     activePlayerId: players[0],
-                    times: { [players[0]]: 45, [players[1]]: 45 }
+                    times: { [players[0]]: 60, [players[1]]: 60 }
                 }
             };
 
-            // On envoie les infos aux deux joueurs
             io.to(code).emit('match-found', {
                 p1Name: p1.nickname,
                 p2Name: p2.nickname,
+                mode,
                 theme: selectedTheme,
                 activePlayerId: players[0],
                 roomCode: code
@@ -533,13 +559,15 @@ io.on('connection', (socket) => {
     });
 
     // --- 1. CRÉER UNE PARTIE ---
-    socket.on('create-room', () => {
+    socket.on('create-room', (data) => {
         const code = generateRoomCode();
         socket.join(code);
+        const avatarConfig = (data && data.avatar) ? data.avatar : null;
 
         rooms[code] = {
             host: socket.id,
             players: [socket.id],
+            avatars: { [socket.id]: avatarConfig },
             settings: { theme: 'athletes', timer: 45 },
             gameState: {} // On stockera les infos de la partie ici
         };
@@ -548,16 +576,27 @@ io.on('connection', (socket) => {
     });
 
     // --- 2. REJOINDRE UNE PARTIE ---
-    socket.on('join-room', (code) => {
+    socket.on('join-room', (payload) => {
+        // Compatibilité : payload peut être une string (code) ou un objet { code, avatar }
+        let code, avatarConfig = null;
+        if (typeof payload === 'string') {
+            code = payload;
+        } else if (payload && typeof payload === 'object') {
+            code = payload.code;
+            avatarConfig = payload.avatar || null;
+        }
+        if (!code) return;
         code = code.toUpperCase();
 
         if (rooms[code]) {
             if (rooms[code].players.length < 2) {
                 socket.join(code);
                 rooms[code].players.push(socket.id);
+                if (!rooms[code].avatars) rooms[code].avatars = {};
+                rooms[code].avatars[socket.id] = avatarConfig;
 
                 socket.emit('room-joined', code);
-                io.to(code).emit('room-update', rooms[code].players.length);
+                io.to(code).emit('room-update', { playerCount: rooms[code].players.length });
             } else {
                 socket.emit('error-message', "Cette partie est déjà pleine !");
             }
@@ -622,15 +661,22 @@ io.on('connection', (socket) => {
     socket.on('start-game', (data) => {
         const room = rooms[data.code];
         if (room) {
-            // On garde la configuration de la room (Thème et Temps)
+            const mode = data.mode || 'images';
             room.settings.theme = data.theme;
             room.settings.timer = parseInt(data.timer);
+            room.settings.mode = mode;
 
-            const selectedTheme = allQuestions[data.theme] ? data.theme : 'athletes';
-            const roomQuestions = shuffle([...allQuestions[selectedTheme]]);
+            let selectedQuestions;
+            if (mode === 'quiz' && quizQuestions[data.theme]) {
+                selectedQuestions = shuffle([...quizQuestions[data.theme]]);
+            } else if (allQuestions[data.theme]) {
+                selectedQuestions = shuffle([...allQuestions[data.theme]]);
+            } else {
+                selectedQuestions = shuffle([...allQuestions['athletes']]);
+            }
 
             room.gameState = {
-                questions: roomQuestions,
+                questions: selectedQuestions,
                 currentQuestionIndex: 0,
                 activePlayerId: room.players[0],
                 times: {
@@ -639,7 +685,6 @@ io.on('connection', (socket) => {
                 }
             };
 
-            // AU LIEU DE RÉÉCRIRE LE TIMER ICI, ON APPELLE LA FONCTION COMMUNE :
             startGame(data.code);
         }
     });
@@ -664,9 +709,17 @@ io.on('connection', (socket) => {
         if (state.activePlayerId !== socket.id) return;
         if (state.activePlayerId !== socket.id || state.isPassing) return;
 
-        const correct = state.questions[state.currentQuestionIndex].answer;
+        const currentQ = state.questions[state.currentQuestionIndex];
+        const respondingPlayer = socket.id;
 
-        if (normalize(guess) === normalize(correct)) {
+        // Vérifie la réponse principale ET toutes les variantes acceptedAnswers
+        const normalizedGuess = normalize(guess);
+        const accepted = currentQ.acceptedAnswers && currentQ.acceptedAnswers.length > 0
+            ? currentQ.acceptedAnswers
+            : [currentQ.answer];
+        const isCorrect = accepted.some(a => normalize(a) === normalizedGuess);
+
+        if (isCorrect) {
             state.currentQuestionIndex++;
 
             // Changement de joueur
@@ -675,8 +728,12 @@ io.on('connection', (socket) => {
             io.to(code).emit('next-round', {
                 nextQuestion: state.questions[state.currentQuestionIndex],
                 activePlayerId: state.activePlayerId,
-                times: state.times
+                times: state.times,
+                correctPlayerId: respondingPlayer
             });
+        } else {
+            // Mauvaise réponse : informer les deux clients pour déclencher l'animation "lose"
+            io.to(code).emit('wrong-answer', { playerId: respondingPlayer });
         }
     });
 
@@ -694,6 +751,9 @@ io.on('connection', (socket) => {
 
         // 1. On verrouille les réponses côté serveur
         state.isPassing = true;
+
+        // Notifier les deux clients pour déclencher les pleurs sur celui qui passe
+        io.to(code).emit('passing', { playerId: socket.id });
 
         // 2. On attend 3 secondes AVANT de changer la question
         setTimeout(() => {
@@ -724,7 +784,34 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- 4. DÉCONNEXION ---
+    // --- 4. QUITTER UNE ROOM VOLONTAIREMENT (bouton retour du lobby) ---
+    socket.on('leave-room', (data) => {
+        const code = data && data.code ? data.code.toUpperCase() : null;
+        if (!code || !rooms[code]) return;
+
+        const room = rooms[code];
+        const index = room.players.indexOf(socket.id);
+        if (index === -1) return;
+
+        // Retirer le joueur de la room et du canal Socket.IO
+        room.players.splice(index, 1);
+        if (room.avatars) delete room.avatars[socket.id];
+        socket.leave(code);
+
+        if (room.players.length === 0) {
+            // Plus personne → on supprime la room
+            if (room.gameState && room.gameState.timerInterval)
+                clearInterval(room.gameState.timerInterval);
+            delete rooms[code];
+            console.log(`Room ${code} supprimée (plus aucun joueur).`);
+        } else {
+            // Il reste un joueur → on le prévient (il redevient seul dans le salon)
+            io.to(code).emit('room-update', { playerCount: room.players.length });
+            console.log(`Joueur ${socket.id} a quitté la room ${code}. Reste ${room.players.length} joueur(s).`);
+        }
+    });
+
+    // --- 5. DÉCONNEXION ---
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];
@@ -732,15 +819,16 @@ io.on('connection', (socket) => {
 
             if (index !== -1) {
                 room.players.splice(index, 1);
-                io.to(code).emit('room-update', room.players.length);
+                if (room.avatars) delete room.avatars[socket.id];
+                io.to(code).emit('room-update', { playerCount: room.players.length });
 
                 if (room.players.length === 0) {
+                    if (room.gameState && room.gameState.timerInterval)
+                        clearInterval(room.gameState.timerInterval);
                     delete rooms[code];
                 }
                 break;
             }
-            if (room.gameState && room.gameState.timerInterval)
-                clearInterval(room.gameState.timerInterval);
         }
         console.log(`Joueur déconnecté : ${socket.id}`);
     });

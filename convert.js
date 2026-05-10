@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const INPUT_DIR = process.argv[2] || 'images_downloaded';
-const OUTPUT_DIR = process.argv[3] || 'images/logos_nfl'; // Par défaut : remplace dans le même dossier
+const OUTPUT_DIR = process.argv[3] || 'images/logos_nrl'; // Par défaut : remplace dans le même dossier
 
 if (!fs.existsSync(INPUT_DIR)) {
     console.error(`Dossier introuvable : ${INPUT_DIR}`);
