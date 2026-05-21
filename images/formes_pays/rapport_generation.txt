@@ -1,0 +1,10 @@
+THÈME FORMES DES PAYS — RAPPORT
+Projet : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree
+GeoJSON : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree\countries.geojson.txt
+Images générées : 189 / 191
+Bloc JS : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree\formes_pays.generated.js
+Fichiers patchés : aucun
+
+PAYS MANQUANTS / ERREURS
+Cap-Vert | ISO attendu: CPV
+Serbie | ISO attendu: SRB

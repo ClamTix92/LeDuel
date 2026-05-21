@@ -1,0 +1,9 @@
+THÈME DÉPARTEMENTS (CARTE) — RAPPORT
+Projet : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree
+GeoJSON : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree\departements-50m-2025.geojson.txt
+Images générées : 101 / 101
+Bloc JS : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree\departements_carte.generated.js
+Fichiers patchés : aucun
+
+DÉPARTEMENTS MANQUANTS / ERREURS
+Aucun

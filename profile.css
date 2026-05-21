@@ -1,0 +1,209 @@
+/* ============================================================
+   PROFIL MODAL — à ajouter à la fin de style.css
+   ============================================================ */
+
+.profile-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.profile-modal {
+  background: #1a1a2e;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 32px 28px 28px;
+  width: 100%;
+  max-width: 380px;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  animation: authSlideIn 0.25s ease;
+}
+
+/* Avatar */
+.profile-avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.profile-avatar-wrapper {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 8px;
+}
+
+.profile-avatar-img {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(255,255,255,0.12);
+}
+
+.profile-avatar-placeholder {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e94560, #c73652);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #fff;
+  border: 3px solid rgba(255,255,255,0.12);
+}
+
+.profile-avatar-edit {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  background: #1a1a2e;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.profile-avatar-edit:hover { background: #2a2a4e; }
+
+.profile-avatar-hint {
+  color: #666;
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+/* Sections */
+.profile-section {
+  margin-bottom: 20px;
+}
+
+.profile-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 10px;
+}
+
+/* Pseudo */
+.profile-username-row {
+  display: flex;
+  gap: 8px;
+}
+
+.profile-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.profile-input:focus { border-color: #e94560; }
+.profile-input::placeholder { color: #555; }
+
+.profile-save-btn {
+  background: linear-gradient(135deg, #e94560, #c73652);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+.profile-save-btn:hover { opacity: 0.85; }
+.profile-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.profile-error {
+  color: #ff8a9a;
+  font-size: 0.82rem;
+  margin: 6px 0 0;
+}
+.profile-success {
+  color: #81c784;
+  font-size: 0.82rem;
+  margin: 6px 0 0;
+}
+
+/* Élo */
+.profile-elo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.profile-elo-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.profile-elo-mode {
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+.profile-elo-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+.profile-elo-label {
+  font-size: 0.72rem;
+  color: #666;
+}
+
+/* Infos compte */
+.profile-account-info {
+  color: #888;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* Upload progress */
+.profile-upload-progress {
+  width: 100%;
+  height: 3px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+  display: none;
+}
+.profile-upload-progress-bar {
+  height: 100%;
+  background: #e94560;
+  border-radius: 2px;
+  transition: width 0.3s;
+  width: 0%;
+}

@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Le Duel</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Fredoka:wght@500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="screen-home">
+  <div class="app-bg" aria-hidden="true"></div>
+  <div class="app-vignette" aria-hidden="true"></div>
+  <div class="particle-layer" aria-hidden="true">
+    <span></span><span></span><span></span><span></span><span></span><span></span>
+  </div>
+
+  <!-- HUD ACCUEIL -->
+  <div class="top-energy-pill" aria-label="Énergie disponible">
+    <span class="energy-icon">⚡</span>
+    <strong>15</strong>
+    <button type="button" aria-label="Ajouter de l'énergie">+</button>
+  </div>
+
+  <div class="top-player-pill">
+    <div class="top-player-avatar" id="top-player-avatar"></div>
+    <div class="top-player-text">
+      <strong>JOUEUR</strong>
+      <span>Niveau 12</span>
+      <i></i>
+    </div>
+    <button type="button" id="btn-profile-settings" aria-label="Personnaliser le profil">
+      <img src="assets/setting-icon.png" alt="" class="profile-settings-icon" aria-hidden="true">
+    </button>
+  </div>
+
+  <!-- ÉCRAN 1 : ACCUEIL / SÉLECTION DU MODE -->
+  <main id="mode-select-container" class="screen-panel screen-home-main">
+    <section class="brand-zone" aria-label="Le Duel Quiz et Culture">
+      <img src="assets/logo.png" alt="Le Duel Quiz & Culture" class="mode-logo">
+    </section>
+
+    <section class="mode-cards" aria-label="Choix du mode de jeu">
+      <article class="mode-card mode-card-images" id="card-images" data-mode="images" tabindex="0" role="button"
+        aria-label="Jouer au mode Images">
+        <div class="mode-card-bg"></div>
+        <img src="assets/confetti.png" alt="" class="card-confetti card-confetti-left" aria-hidden="true">
+        <div class="card-icon-wrap">
+          <img src="assets/image_icon.png" alt="" class="mode-icon mode-icon-images" aria-hidden="true">
+        </div>
+        <h2>IMAGES</h2>
+        <p>Reconnais les images<br>avant tout le monde !</p>
+        <button class="card-play-btn" type="button"><span class="play-triangle">▶</span> JOUER</button>
+      </article>
+
+      <article class="mode-card mode-card-quiz" id="card-quiz" data-mode="quiz" tabindex="0" role="button"
+        aria-label="Jouer au mode Quiz">
+        <div class="mode-card-bg"></div>
+        <img src="assets/confetti.png" alt="" class="card-confetti card-confetti-right" aria-hidden="true">
+        <div class="card-icon-wrap">
+          <img src="assets/trophy.png" alt="" class="mode-icon mode-icon-trophy" aria-hidden="true">
+        </div>
+        <h2>QUIZ</h2>
+        <p>Réponds à des questions<br>de culture générale !</p>
+        <button class="card-play-btn" type="button"><span class="play-triangle">▶</span> JOUER</button>
+      </article>
+    </section>
+
+    <section class="private-bar" aria-label="Partie privée">
+      <button class="private-create" id="btn-create-room-home" type="button">
+        <span class="private-create-plus">+</span>
+        <span class="private-create-labels">
+          <strong>CRÉER</strong>
+          <small>UNE PARTIE</small>
+        </span>
+      </button>
+
+      <div class="private-title">
+        <span>⚡</span>
+        <strong>PARTIE PRIVÉE</strong>
+        <span>⚡</span>
+      </div>
+
+      <form class="private-join" id="private-join-form" autocomplete="off">
+        <input type="text" id="input-room-code" placeholder="Code de la partie" maxlength="4" class="join-input-home"
+          aria-label="Code de partie privée">
+        <button class="btn-join-home" id="btn-join-room" type="submit">REJOINDRE</button>
+      </form>
+    </section>
+
+  </main>
+
+  <button class="home-mascot" id="mascot-button" type="button" aria-label="Défi surprise de la mascotte">
+    <img src="assets/mascot.png" alt="Mascotte Le Duel">
+    <span>Défi surprise</span>
+  </button>
+
+  <!-- AVATAR DROITE : système personnalisable conservé, habillé façon image cible -->
+  <aside class="home-avatar-side" aria-label="Avatar du joueur">
+    <div class="avatar-card-head">
+      <img src="assets/star.png" alt="" aria-hidden="true">
+      <strong>MON AVATAR</strong>
+    </div>
+    <div class="home-avatar-display" id="home-avatar-display"></div>
+    <button class="btn-customize-avatar" id="btn-customize-avatar" type="button">👕 PERSONNALISER</button>
+  </aside>
+
+  <!-- MODALE : CRÉER / REJOINDRE UNE PARTIE PRIVÉE -->
+  <div class="private-room-overlay" id="private-room-overlay" aria-hidden="true">
+    <div class="private-room-sheet" role="dialog" aria-modal="true" aria-labelledby="private-room-title">
+      <button class="sheet-close" id="private-room-close" type="button" aria-label="Fermer">×</button>
+      <img src="assets/mystery_box.png" alt="" class="sheet-illustration" aria-hidden="true">
+      <div class="sheet-copy">
+        <p class="eyebrow">Partie privée</p>
+        <h2 id="private-room-title">Invite un ami au duel</h2>
+        <p>Crée un salon, partage le code, puis règle le mode, le thème et le chrono dans le lobby.</p>
+      </div>
+      <div class="sheet-actions">
+        <button class="sheet-primary" id="private-create-confirm" type="button">CRÉER UN SALON</button>
+        <div class="sheet-join-line">
+          <input type="text" id="sheet-room-code" maxlength="4" placeholder="CODE" aria-label="Code de salon">
+          <button id="private-join-confirm" type="button">REJOINDRE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ÉCRAN 2 : DÉTAIL MODE -->
+  <section id="home-container" class="screen-panel mode-detail" style="display:none;">
+    <button class="btn-back" id="btn-back-home" type="button">← Retour</button>
+    <img src="assets/logo.png" alt="Le Duel" class="home-logo">
+    <div class="mode-detail-card">
+      <p class="home-mode-label" id="home-mode-label">Mode Images</p>
+      <h1>Prêt pour le duel ?</h1>
+      <p class="mode-detail-subtitle">Lance un matchmaking instantané ou crée une partie privée avec tes propres règles.
+      </p>
+      <div class="mm-rounds-block">
+        <p class="setting-label">Manches gagnantes</p>
+        <div class="choice-group choice-group-centered rounds-grid" id="mm-rounds-choice-group">
+          <button class="choice-btn mm-rounds-choice" data-rounds="1" type="button">BO1</button>
+          <button class="choice-btn mm-rounds-choice" data-rounds="3" type="button">BO3</button>
+          <button class="choice-btn mm-rounds-choice" data-rounds="5" type="button">BO5</button>
+        </div>
+      </div>
+      <div class="home-actions">
+        <button class="btn-home btn-matchmaking-style" id="btn-matchmaking" type="button" disabled>
+          <span class="btn-icon">⚡</span> JOUER EN MATCHMAKING
+        </button>
+      </div>
+      <div class="rules-box" id="rules-box">
+        <p class="rules-title">Règles du mode</p>
+        <ul class="rules-list" id="rules-list"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÉCRAN 3 : LOBBY -->
+  <section id="lobby-container" class="screen-panel menu-box lobby-screen" style="display:none;">
+    <button class="btn-back" id="btn-back-lobby" type="button">← Retour</button>
+
+
+    <div class="match-header">
+      <img src="assets/logo.png" alt="Le Duel" class="game-logo">
+    </div>
+
+    <div class="lobby-topline">
+      <div class="lobby-code-block">
+        <p class="eyebrow">Salon privé</p>
+        <div class="lobby-code-row">
+          <h2>Code : <span id="display-room-code" class="highlight">----</span></h2>
+          <button id="btn-copy-room-code" class="copy-code-btn" type="button">COPIER</button>
+        </div>
+      </div>
+
+      <div class="match-score-block" id="lobby-score-block" style="display:none;">
+        <p class="score-block-label">Score</p>
+        <div class="score-block-digits">
+          <span id="lobby-score-me">0</span>
+          <span class="score-block-sep"> – </span>
+          <span id="lobby-score-opp">0</span>
+        </div>
+      </div>
+      <div class="player-count-card">
+        <span id="room-player-count">1</span><small>/2 joueurs</small>
+      </div>
+    </div>
+
+    <div id="host-settings" class="host-settings-card">
+      <div class="host-settings-header">
+        <h3 id="settings-title">Paramètres de la partie</h3>
+        <button class="answers-toggle-btn" id="btn-show-answers" type="button" aria-label="Voir les réponses du match">
+          <span class="answers-toggle-label">Réponses</span>
+          <img src="assets/arrow-icon.png" alt="" class="answers-toggle-arrow" aria-hidden="true">
+        </button>
+      </div>
+      <p class="settings-intro">Choisis les règles avant de lancer le duel.</p>
+
+      <div class="setting-row">
+        <div class="setting-block setting-block-inline">
+          <p class="setting-label">Mode de jeu</p>
+          <div class="choice-group choice-group-centered" id="mode-choice-group">
+            <button class="choice-btn" data-mode="images" id="choice-mode-images" type="button">🖼️ Images</button>
+            <button class="choice-btn" data-mode="quiz" id="choice-mode-quiz" type="button">🏆 Quiz</button>
+          </div>
+        </div>
+
+        <div class="setting-block setting-block-inline">
+          <p class="setting-label">Temps par joueur</p>
+          <div class="choice-group choice-group-centered timer-grid" id="timer-choice-group">
+            <button class="choice-btn timer-choice" data-timer="30" type="button">30 s</button>
+            <button class="choice-btn timer-choice active-choice" data-timer="45" type="button">45 s</button>
+            <button class="choice-btn timer-choice" data-timer="60" type="button">60 s</button>
+          </div>
+        </div>
+
+        <div class="setting-block setting-block-inline">
+          <p class="setting-label">Manches gagnantes</p>
+          <div class="choice-group choice-group-centered rounds-grid" id="rounds-choice-group">
+            <button class="choice-btn rounds-choice" data-rounds="1" type="button">BO1</button>
+            <button class="choice-btn rounds-choice active-choice" data-rounds="3" type="button">BO3</button>
+            <button class="choice-btn rounds-choice" data-rounds="5" type="button">BO5</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-block">
+        <p class="setting-label setting-label-centered">Thème</p>
+        <div class="choice-group choice-group-grid" id="theme-choice-group">
+          <button class="choice-btn theme-choice" data-theme="athletes" type="button">Athlètes Français</button>
+          <button class="choice-btn theme-choice" data-theme="stades" type="button">Stades de Foot</button>
+          <button class="choice-btn theme-choice" data-theme="logospremierleague" type="button">Premier League</button>
+          <button class="choice-btn theme-choice" data-theme="logosligue1" type="button">Ligue 1</button>
+          <button class="choice-btn theme-choice" data-theme="logoslaliga" type="button">La Liga</button>
+          <button class="choice-btn theme-choice" data-theme="logosbundesliga" type="button">Bundesliga</button>
+          <button class="choice-btn theme-choice" data-theme="logosseriea" type="button">Serie A</button>
+          <button class="choice-btn theme-choice" data-theme="logostop14" type="button">Top 14</button>
+          <button class="choice-btn theme-choice" data-theme="logosnationsrugby" type="button">Nations Rugby</button>
+          <button class="choice-btn theme-choice" data-theme="logosnba" type="button">NBA</button>
+          <button class="choice-btn theme-choice" data-theme="logosnfl" type="button">NFL</button>
+          <button class="choice-btn theme-choice" data-theme="logosnhl" type="button">NHL</button>
+          <button class="choice-btn theme-choice" data-theme="logosmlb" type="button">MLB</button>
+          <button class="choice-btn theme-choice" data-theme="logosmls" type="button">MLS</button>
+          <button class="choice-btn theme-choice" data-theme="logosnrl" type="button">NRL</button>
+          <button class="choice-btn theme-choice" data-theme="voitures" type="button">Marques de Voitures</button>
+          <button class="choice-btn theme-choice" data-theme="politiquefr" type="button">Politiques Français</button>
+          <button class="choice-btn theme-choice" data-theme="hommesetat" type="button">Hommes/Femmes d'état</button>
+          <button class="choice-btn theme-choice" data-theme="animaux" type="button">Animaux</button>
+          <button class="choice-btn theme-choice" data-theme="chiens" type="button">Chiens</button>
+          <button class="choice-btn theme-choice" data-theme="chats" type="button">Chats</button>
+          <button class="choice-btn theme-choice" data-theme="drapeaux" type="button">Drapeaux Pays</button>
+          <button class="choice-btn theme-choice" data-theme="departementsnoms" type="button">Départements (Noms)</button>
+          <button class="choice-btn theme-choice" data-theme="departementsnumeros" type="button">Départements (Numéros)</button>
+          <button class="choice-btn theme-choice" data-theme="capitales" type="button">Capitales</button>
+          <button class="choice-btn theme-choice" data-theme="capitalespays" type="button">Capitales (Nom du pays)</button>
+          <button class="choice-btn theme-choice" data-theme="chefslieux" type="button">Chefs-lieux</button>
+          <button class="choice-btn theme-choice" data-theme="chefslieuxnoms" type="button">Chefs-lieux (Nom du département)</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quiztout" type="button">Tout</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizculture" type="button">Culture
+            Générale</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizhistoire"
+            type="button">Histoire</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizgeographie"
+            type="button">Géographie</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizsport" type="button">Sport</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizsciences"
+            type="button">Sciences</button>
+          <button class="choice-btn theme-choice theme-choice-quiz" data-theme="quizcinema"
+            type="button">Cinéma</button>
+        </div>
+      </div>
+
+      <button id="btn-start-custom" type="button" disabled>LANCER LE DUEL</button>
+      <p id="guest-waiting-note" class="guest-waiting-note" style="display:none;">⏳ En attente de l'hôte : il configure les paramètres et lancera le duel.</p>
+    </div>
+  </section>
+
+  <!-- ÉCRAN : RÉPONSES DU MATCH EN COURS -->
+  <section id="answers-container" class="screen-panel answers-screen" style="display:none;">
+    <button class="btn-back" id="btn-back-answers" type="button">← Retour</button>
+
+    <div class="match-header">
+      <img src="assets/logo.png" alt="Le Duel" class="game-logo">
+    </div>
+
+    <div class="answers-content">
+      <h2 class="answers-title">Réponses</h2>
+      <p class="answers-subtitle">Récapitulatif des questions du match en cours</p>
+      <div class="answers-list" id="answers-list"></div>
+      <p class="answers-empty" id="answers-empty">Aucune question n'a encore été jouée dans ce match.</p>
+    </div>
+  </section>
+
+  <!-- ÉCRAN DE TRANSITION : COMPTE À REBOURS AVANT LE DUEL -->
+  <section id="transition-container" class="screen-panel menu-box transition-screen" style="display:none;">
+    <button class="btn-back" id="btn-back-transition" type="button">← Retour</button>
+    <img src="assets/logo.png" alt="Le Duel" class="game-logo">
+    <p class="transition-mode-label" id="transition-mode-label">Mode Images</p>
+    <div class="transition-countdown-wrap">
+      <img id="transition-countdown-img" src="" alt="" class="transition-countdown-img">
+    </div>
+    <p class="transition-start-text highlight">La Partie Commence !</p>
+  </section>
+
+  <!-- ÉCRAN 4 : MATCHMAKING -->
+  <section id="matchmaking-container" class="screen-panel menu-box matchmaking-screen" style="display:none;">
+    <button class="btn-back" id="btn-back-matchmaking" type="button">← Retour</button>
+    <div id="queue-status">
+      <div class="loader"></div>
+      <h2>Recherche d'un adversaire...</h2>
+      <p>Elo estimé : <span id="my-elo-display">1000</span></p>
+    </div>
+
+    <div id="vs-screen" style="display:none;">
+      <div class="vs-layout">
+        <div class="player-card left">
+          <div class="avatar"></div>
+          <h3 id="p1-name">Joueur 1</h3>
+          <span class="badge">COMMENCE</span>
+        </div>
+
+        <div class="vs-middle">VS</div>
+
+        <div class="player-card right">
+          <div class="avatar"></div>
+          <h3 id="p2-name">Joueur 2</h3>
+          <span class="badge">RÉPOND</span>
+        </div>
+      </div>
+
+      <div class="match-info">
+        <p>Thème : <span id="match-theme" class="highlight">---</span></p>
+        <h1 id="match-countdown">3</h1>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÉCRAN 5 : JEU -->
+  <section id="game-container" class="screen-panel game-screen" style="display:none;">
+    <button class="btn-back" id="btn-back-game" type="button">← Retour</button>
+
+    <div class="match-score-block" id="game-score-block" style="display:none;">
+      <p class="score-block-label">Score</p>
+      <div class="score-block-digits">
+        <span id="game-score-me">0</span>
+        <span class="score-block-sep"> – </span>
+        <span id="game-score-opp">0</span>
+      </div>
+    </div>
+
+    <div class="game-avatars-row">
+      <div class="game-avatar-slot left" id="game-avatar-me" data-label="TOI"></div>
+      <div class="game-avatar-slot right" id="game-avatar-opp" data-label="ADVERSAIRE"></div>
+    </div>
+
+    <div class="match-header">
+      <div class="match-logo-block">
+        <img src="assets/logo.png" alt="Le Duel" class="game-logo">
+        <p class="match-round-label" id="game-round-label"></p>
+      </div>
+    </div>
+
+    <div id="display-area"></div>
+
+    <div id="quiz-display-area" style="display:none;">
+      <p id="quiz-question-text"></p>
+    </div>
+
+    <p class="hint-text">Les accents ne sont pas nécessaires<br>Tape uniquement les noms de famille des sportifs !</p>
+
+    <div id="input-area">
+      <input type="text" id="answer-input" placeholder="Tape ta réponse ici..." autocomplete="off">
+      <button id="pass-btn" type="button">PASSER</button>
+    </div>
+
+    <div id="scoreboard">
+      <div class="player player-me" id="player-pill-me">
+        <div class="timer-bar timer-bar-me timer-green" id="timer-bar-me"></div>
+        <span class="timer-label">Toi</span>
+        <span class="timer-value">
+          <span class="tv-secs" id="my-time-secs">45</span><span class="tv-sep">:</span><span class="tv-centis" id="my-time-centis">00</span><span class="timer-unit">s</span>
+        </span>
+      </div>
+      <div class="player player-opp" id="player-pill-opp">
+        <div class="timer-bar timer-bar-opp timer-green" id="timer-bar-opp"></div>
+        <span class="timer-value">
+          <span class="tv-secs" id="opp-time-secs">45</span><span class="tv-sep">:</span><span class="tv-centis" id="opp-time-centis">00</span><span class="timer-unit">s</span>
+        </span>
+        <span class="timer-label">Adversaire</span>
+      </div>
+    </div>
+
+    <!-- Résultat de manche (affiché 2s avant retour au lobby) -->
+    <div id="round-transition-screen" style="display:none;">
+      <h2 id="round-transition-result">Manche remportée !</h2>
+      <p class="round-transition-score-label">Score</p>
+      <div class="round-transition-score">
+        <span id="round-transition-score-me" class="round-transition-digit">0</span>
+        <em class="round-transition-sep">–</em>
+        <span id="round-transition-score-opp" class="round-transition-digit">0</span>
+      </div>
+    </div>
+
+    <div id="game-over-screen" style="display:none;">
+      <img src="assets/logo.png" alt="Le Duel" class="game-over-logo">
+      <h2 id="winner-message">VICTOIRE !</h2>
+      <p class="game-over-score-label">Score</p>
+      <div class="game-over-score">
+        <span id="game-over-score-me" class="game-over-digit">0</span>
+        <em class="game-over-sep">–</em>
+        <span id="game-over-score-opp" class="game-over-digit">0</span>
+      </div>
+      <button id="restart-btn" type="button">REJOUER</button>
+    </div>
+  </section>
+
+  <!-- MODALE : PERSONNALISATION D'AVATAR -->
+  <div class="avatar-modal-overlay" id="avatar-modal-overlay">
+    <div class="avatar-modal" id="avatar-modal">
+      <div class="avatar-modal-preview">
+        <h2>Ton avatar</h2>
+        <p class="avatar-modal-subtitle">Personnalise-le à ton goût</p>
+        <div class="avatar-modal-preview-box" id="avatar-preview"></div>
+        <div class="avatar-modal-preview-actions">
+          <button class="preview-action-btn" id="preview-test-win" type="button">Tester victoire</button>
+          <button class="preview-action-btn" id="preview-test-lose" type="button">Tester défaite</button>
+        </div>
+      </div>
+
+      <div class="avatar-modal-options" id="avatar-options"></div>
+
+      <div class="avatar-modal-footer">
+        <button class="btn-modal btn-modal-cancel" id="btn-avatar-cancel" type="button">ANNULER</button>
+        <button class="btn-modal btn-modal-save" id="btn-avatar-save" type="button">ENREGISTRER</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-toast" id="home-toast" role="status" aria-live="polite"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="avatar.js"></script>
+  <script src="script.js"></script>
+</body>
+
+</html>

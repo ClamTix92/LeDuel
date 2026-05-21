@@ -1,0 +1,9 @@
+THÈME ÉTATS DES USA — CARTE AVEC ÉTAT SURLIGNÉ — RAPPORT
+Projet : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree
+GeoJSON : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree\us_states.json
+Images générées : 48 / 48
+Bloc JS : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree\etats_usa.generated.js
+Fichiers patchés : aucun
+
+ÉTATS MANQUANTS / ERREURS
+Aucun

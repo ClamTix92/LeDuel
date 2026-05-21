@@ -1,0 +1,33 @@
+{
+  "name": "le-duel-ui-integrated",
+  "version": "1.0.0",
+  "description": "Le Duel - interface gamer/casual intégrée avec assets PNG",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cloudinary": "^2.10.0",
+    "connect-pg-simple": "^10.0.0",
+    "cookie": "^1.1.1",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.3",
+    "express-rate-limit": "^8.5.2",
+    "express-session": "^1.19.0",
+    "express-validator": "^7.3.2",
+    "file-type": "^22.0.1",
+    "helmet": "^8.1.0",
+    "multer": "^2.1.1",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "passport-local": "^1.0.0",
+    "passport-steam": "^1.0.18",
+    "pg": "^8.21.0",
+    "resend": "^6.12.3",
+    "socket.io": "^4.7.5",
+    "uuid": "^14.0.0"
+  }
+}

@@ -1,0 +1,2483 @@
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const fs = require('fs');
+const path = require('path');
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+// File d'attente matchmaking — chaque entrée : { socket, acceptedRounds: [1,3,5] }
+const matchmakingQueue = [];
+
+app.use(express.static(__dirname));
+
+// On va stocker toutes les parties en cours ici
+const rooms = {};
+
+// Fonction pour générer un code aléatoire à 4 lettres
+function generateRoomCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+/**
+ * Construit une liste ordonnée de questions avec une montée *progressive*
+ * en difficulté (et non plus par paliers stricts).
+ *
+ *  - Convention inchangée : chaque question peut porter un champ `difficulty`
+ *    valant 1 (facile), 2 (moyen) ou 3 (difficile). Les questions sans champ
+ *    sont traitées comme 2 (moyen).
+ *  - Les WARMUP premières positions sont garanties en difficulté 1, peu
+ *    importe le thème. Si le palier 1 est plus petit que WARMUP, on retombe
+ *    sur le palier non vide le plus proche.
+ *  - Au-delà de WARMUP, chaque position est tirée au sort dans un mélange
+ *    pondéré des trois paliers : le poids de la difficulté 1 décroît, celui
+ *    de la difficulté 3 croît (avec un léger délai). La difficulté 2 occupe
+ *    le reste.
+ *  - Conséquence : on n'épuise plus tout le palier 1 avant de voir un palier
+ *    2 ou 3. Plus le duel s'éternise, plus les questions difficiles sont
+ *    probables — quitte à laisser des questions faciles non utilisées.
+ *
+ *  Les constantes ci-dessous contrôlent la pente exacte de la progression :
+ *  baisser D1_DECAY ralentit la montée en difficulté, monter D3_GROWTH la
+ *  rend plus brutale, etc.
+ */
+function shuffleByDifficulty(array) {
+    const tiers = { 1: [], 2: [], 3: [] };
+    for (const q of array) {
+        const d = (q.difficulty === 1 || q.difficulty === 3) ? q.difficulty : 2;
+        tiers[d].push(q);
+    }
+    // Mélange interne à chaque palier pour que l'ordre exact varie d'une partie à l'autre.
+    shuffle(tiers[1]);
+    shuffle(tiers[2]);
+    shuffle(tiers[3]);
+
+    // --- Paramètres de la progression de difficulté (ajustables) ---
+    const WARMUP = 4;        // Nb de questions garanties en difficulté 1 au début
+    const D1_DECAY = 0.10;   // Décroissance du poids de D1 par position après le warmup
+    const D1_FLOOR = 0.10;   // Plancher du poids de D1 (D1 ne disparaît jamais totalement)
+    const D3_DELAY = 2;      // Positions après le warmup avant que D3 commence à apparaître
+    const D3_GROWTH = 0.07;  // Croissance du poids de D3 par position
+    const D3_CEIL = 0.50;    // Plafond du poids de D3
+
+    // Choisit un palier pour la position donnée (1-indexée).
+    // Si le palier "tiré" est vide, on retombe sur le palier non vide le plus proche.
+    function pickTier(position) {
+        let w1, w2, w3;
+        if (position <= WARMUP) {
+            // Phase de warmup : on force la difficulté 1.
+            w1 = 1; w2 = 0; w3 = 0;
+        } else {
+            const t = position - WARMUP; // 1, 2, 3, …
+            w1 = Math.max(D1_FLOOR, 1 - D1_DECAY * t);
+            w3 = Math.max(0, Math.min(D3_CEIL, D3_GROWTH * (t - D3_DELAY)));
+            w2 = Math.max(0, 1 - w1 - w3);
+        }
+
+        // Tirage pondéré du palier souhaité.
+        const total = w1 + w2 + w3;
+        let desired = 2; // garde-fou théorique
+        if (total > 0) {
+            let r = Math.random() * total;
+            if ((r -= w1) < 0) desired = 1;
+            else if ((r -= w2) < 0) desired = 2;
+            else desired = 3;
+        }
+
+        // Si le palier souhaité est vide, on prend le voisin non vide le plus proche.
+        if (tiers[desired].length > 0) return desired;
+        const fallbackOrder = (desired === 1) ? [2, 3]
+                            : (desired === 3) ? [2, 1]
+                            : [1, 3];
+        for (const d of fallbackOrder) {
+            if (tiers[d].length > 0) return d;
+        }
+        return null; // plus aucune question disponible
+    }
+
+    const ordered = [];
+    let position = 1;
+    while (tiers[1].length + tiers[2].length + tiers[3].length > 0) {
+        const tier = pickTier(position);
+        if (tier === null) break;
+        ordered.push(tiers[tier].shift());
+        position++;
+    }
+    return ordered;
+}
+
+// Remplace toutes les occurrences d'un ancien socket.id par un nouveau dans
+// l'état persistant du match (settings). Utilisé quand un joueur revient dans
+// un salon resté vacant après son départ : son nouvel ID doit hériter de ses
+// manches gagnées et de ses réponses, sinon le score et l'écran "Réponses"
+// l'attribuent à "l'adversaire".
+function remapPlayerId(room, oldId, newId) {
+    if (!room || !room.settings || oldId === newId) return;
+    const s = room.settings;
+    if (Array.isArray(s.matchHistory)) {
+        s.matchHistory = s.matchHistory.map(id => id === oldId ? newId : id);
+    }
+    if (Array.isArray(s.matchAnswers)) {
+        s.matchAnswers.forEach(a => {
+            if (a.playerId === oldId) a.playerId = newId;
+        });
+    }
+    if (s.score && Object.prototype.hasOwnProperty.call(s.score, oldId)) {
+        s.score[newId] = s.score[oldId];
+        delete s.score[oldId];
+    }
+    if (s.nextRoundStarterId === oldId) {
+        s.nextRoundStarterId = newId;
+    }
+}
+
+// Construit l'instantané du match en cours à renvoyer au client qui (re)joint
+// le salon. Permet de restaurer l'affichage Manche X/X, le score et l'écran
+// "Réponses" même après un aller-retour par l'écran d'accueil.
+function buildLobbyMatchState(room) {
+    if (!room || !room.settings) return null;
+    const s = room.settings;
+    const hasMatch = Array.isArray(s.matchHistory) && s.rounds > 1;
+    if (!hasMatch) return null;
+    return {
+        rounds: s.rounds,
+        currentRound: s.currentRound || (s.matchHistory.length + 1),
+        matchHistory: s.matchHistory.slice(),
+        matchAnswers: Array.isArray(s.matchAnswers) ? s.matchAnswers.slice() : [],
+        score: Object.assign({}, s.score || {}),
+        mode: s.mode || null,
+        theme: s.theme || null,
+        timer: s.timer || null
+    };
+}
+
+// Nettoie tous les timers/timeouts associés à un gameState et le neutralise.
+function cleanupGameTimers(room) {
+    if (!room || !room.gameState) return;
+    if (room.gameState.timerInterval) clearInterval(room.gameState.timerInterval);
+    if (room.gameState.transitionTimeout) clearTimeout(room.gameState.transitionTimeout);
+    if (room.gameState.startGameTimeout) clearTimeout(room.gameState.startGameTimeout);
+    room.gameState = null;
+}
+
+// Délai (ms) pendant lequel un salon vidé reste réservé, le temps que l'hôte
+// puisse revenir via l'écran d'accueil sans perdre l'état du match.
+const ROOM_VACANT_TTL_MS = 10 * 60 * 1000;
+
+function scheduleRoomCleanup(code) {
+    const room = rooms[code];
+    if (!room) return;
+    if (room.cleanupTimeout) clearTimeout(room.cleanupTimeout);
+    room.cleanupTimeout = setTimeout(() => {
+        if (rooms[code] && rooms[code].players.length === 0) {
+            delete rooms[code];
+            console.log(`Room ${code} supprimée après inactivité (${ROOM_VACANT_TTL_MS / 1000}s).`);
+        }
+    }, ROOM_VACANT_TTL_MS);
+}
+
+function cancelRoomCleanup(room) {
+    if (room && room.cleanupTimeout) {
+        clearTimeout(room.cleanupTimeout);
+        room.cleanupTimeout = null;
+    }
+}
+
+function startGame(code) {
+    const room = rooms[code];
+    if (!room || !room.gameState) return;
+
+    io.to(code).emit('init-game', {
+        question: room.gameState.questions[0],
+        activePlayerId: room.gameState.activePlayerId,
+        times: room.gameState.times,
+        theme: room.settings.theme,
+        mode: room.settings.mode || 'images',
+        avatars: room.avatars || {},
+        rounds: room.settings.rounds || 1,
+        winsNeeded: room.settings.winsNeeded || 1,
+        score: room.settings.score || {},
+        matchHistory: room.settings.matchHistory || [],
+        currentRound: room.settings.currentRound || 1,
+        matchAnswers: room.settings.matchAnswers || []
+    });
+
+    // Le client affiche un écran de transition (compte à rebours 3-2-1) pendant
+    // 2 secondes avant que le duel ne devienne réellement visible. On retarde
+    // d'autant le démarrage du chrono côté serveur, sinon les joueurs perdraient
+    // ces 2 secondes sans pouvoir jouer.
+    room.gameState.startGameTimeout = setTimeout(() => {
+        const r = rooms[code];
+        if (!r || !r.gameState) return; // partie annulée pendant la transition
+        startRoundTimer(code);
+    }, 2000);
+}
+
+function getActiveRemainingTime(state, now = Date.now()) {
+    if (!state || !state.activePlayerId || !state.times) return 0;
+    const activeId = state.activePlayerId;
+    const startAt = typeof state.activeTurnStartedAt === 'number'
+        ? state.activeTurnStartedAt
+        : now;
+    const startValue = typeof state.activeTurnStartValue === 'number'
+        ? state.activeTurnStartValue
+        : Number(state.times[activeId] || 0);
+    const elapsed = (now - startAt) / 1000;
+    return Math.max(0, startValue - elapsed);
+}
+
+function freezeActiveTimer(state, now = Date.now()) {
+    if (!state || !state.activePlayerId || !state.times) return;
+    const activeId = state.activePlayerId;
+    state.times[activeId] = getActiveRemainingTime(state, now);
+    state.activeTurnStartedAt = null;
+    state.activeTurnStartValue = null;
+}
+
+// Lance / relance le décompte du joueur actif pour la manche courante.
+// Le serveur conserve maintenant les décimales réelles du chrono : quand un
+// joueur répond entre deux ticks serveur, on fige son temps exact au centième
+// côté client au lieu de revenir à la seconde entière supérieure.
+function startRoundTimer(code) {
+    const room = rooms[code];
+    if (!room || !room.gameState) return;
+
+    const state = room.gameState;
+    if (state.timerInterval) clearInterval(state.timerInterval);
+
+    const activeId = state.activePlayerId;
+    if (!activeId) return;
+
+    state.activeTurnStartedAt = Date.now();
+    state.activeTurnStartValue = Number(state.times[activeId] || 0);
+
+    state.timerInterval = setInterval(() => {
+        const currentRoom = rooms[code];
+        if (!currentRoom || !currentRoom.gameState) return;
+
+        const currentState = currentRoom.gameState;
+        const currentActiveId = currentState.activePlayerId;
+        if (!currentActiveId) return;
+
+        const remaining = getActiveRemainingTime(currentState);
+        currentState.times[currentActiveId] = remaining;
+
+        if (remaining <= 0) {
+            currentState.times[currentActiveId] = 0;
+            clearInterval(currentState.timerInterval);
+            currentState.timerInterval = null;
+            currentState.activeTurnStartedAt = null;
+            currentState.activeTurnStartValue = null;
+            handleRoundEnd(code, currentActiveId);
+        } else {
+            io.to(code).emit('timer-update', currentState.times);
+        }
+    }, 1000);
+}
+
+// Appelé quand un joueur a épuisé son temps sur la manche en cours.
+// loserId = celui dont le timer est tombé à 0.
+function handleRoundEnd(code, loserId) {
+    const room = rooms[code];
+    if (!room || !room.gameState) return;
+    const winnerId = room.players.find(id => id !== loserId);
+    const winsNeeded = room.settings.winsNeeded || 1;
+
+    // Enregistrer la question qui était à l'écran quand le temps a expiré
+    // (avant d'incrémenter currentRound pour avoir le bon numéro de manche)
+    const timedOutQuestion = room.gameState.questions[room.gameState.currentQuestionIndex];
+    if (timedOutQuestion) {
+        room.settings.matchAnswers = room.settings.matchAnswers || [];
+        room.settings.matchAnswers.push({
+            question: timedOutQuestion,
+            mode: room.settings.mode || 'images',
+            outcome: 'timeout',
+            playerId: loserId,
+            round: room.settings.currentRound || 1
+        });
+    }
+
+    // Mettre à jour l'historique et le score dans room.settings (persiste entre manches)
+    room.settings.matchHistory = room.settings.matchHistory || [];
+    room.settings.matchHistory.push(winnerId);
+    room.settings.score = room.settings.score || {};
+    room.settings.score[winnerId] = (room.settings.score[winnerId] || 0) + 1;
+    room.settings.currentRound = (room.settings.currentRound || 1) + 1;
+    room.settings.nextRoundStarterId = loserId;
+
+    const score = room.settings.score;
+    const matchHistory = room.settings.matchHistory;
+    const nextRound = room.settings.currentRound;
+    const matchAnswers = room.settings.matchAnswers || [];
+
+    // Match terminé ?
+    if (score[winnerId] >= winsNeeded) {
+        // Nettoyer l'état du match pour la prochaine partie.
+        // matchAnswers reste disponible (envoyé dans game-over) jusqu'au prochain start-game.
+        room.settings.matchHistory = undefined;
+        room.settings.score = undefined;
+        room.settings.currentRound = 1;
+        room.settings.nextRoundStarterId = null;
+
+        io.to(code).emit('game-over', { winnerId, score, matchHistory, matchAnswers });
+        return;
+    }
+
+    // Fin de manche sans fin de match :
+    // 1. Informer les clients du résultat
+    io.to(code).emit('round-end', {
+        roundWinnerId: winnerId,
+        roundLoserId: loserId,
+        score,
+        matchHistory,
+        nextRound,
+        matchAnswers
+    });
+
+    const isMatchmaking = code.startsWith('MATCH-');
+
+    if (isMatchmaking) {
+        // Matchmaking : relance automatique après 3s
+        room.gameState.transitionTimeout = setTimeout(() => {
+            const r = rooms[code];
+            if (!r || !r.gameState) return;
+            r.gameState.times = {
+                [r.players[0]]: r.settings.timer,
+                [r.players[1]]: r.settings.timer
+            };
+            r.gameState.activePlayerId = loserId;
+            if (r.gameState.currentQuestionIndex >= r.gameState.questions.length) {
+                r.gameState.questions = shuffleByDifficulty([...r.gameState.questions]);
+                r.gameState.currentQuestionIndex = 0;
+            }
+            const nextQuestion = r.gameState.questions[r.gameState.currentQuestionIndex];
+            io.to(code).emit('round-start', {
+                question: nextQuestion,
+                activePlayerId: r.gameState.activePlayerId,
+                times: r.gameState.times,
+                currentRound: r.settings.currentRound,
+                score: r.settings.score,
+                matchHistory: r.settings.matchHistory,
+                matchAnswers: r.settings.matchAnswers || []
+            });
+            startRoundTimer(code);
+        }, 3000);
+    } else {
+        // Partie privée : retour au salon après 2s
+        room.gameState.transitionTimeout = setTimeout(() => {
+            const r = rooms[code];
+            if (!r) return;
+            if (r.gameState && r.gameState.timerInterval) clearInterval(r.gameState.timerInterval);
+            r.gameState = null;
+            io.to(code).emit('return-to-lobby', {
+                matchHistory: r.settings.matchHistory,
+                score: r.settings.score,
+                nextRound: r.settings.currentRound,
+                rounds: r.settings.rounds,
+                winsNeeded: r.settings.winsNeeded,
+                matchAnswers: r.settings.matchAnswers || []
+            });
+        }, 2000);
+    }
+}
+
+function normalize(str) {
+    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+let questions = []; // La liste qui sera utilisée pour la partie
+
+/**
+ * ========================================================
+ *  CONVENTION DE DIFFICULTÉ DES QUESTIONS
+ * ========================================================
+ *
+ *  Chaque question peut porter un champ optionnel `difficulty` :
+ *      1 = facile      (apparaît au début de la partie, chrono plein)
+ *      2 = moyen       (défaut si le champ est absent)
+ *      3 = difficile   (apparaît à la fin, quand le chrono se vide)
+ *
+ *  Le serveur assemble la liste de questions via `shuffleByDifficulty` :
+ *  les 4 premières positions sont garanties en difficulté 1 (warmup), puis
+ *  chaque position suivante est tirée au sort dans un mélange pondéré des
+ *  trois paliers. Le poids de la difficulté 1 décroît au fil des positions,
+ *  celui de la difficulté 3 croît. La difficulté 2 occupe le reste.
+ *  Conséquence : on n'épuise plus systématiquement le palier 1 avant de voir
+ *  un palier 2 ou 3 — la difficulté monte vraiment progressivement.
+ *
+ *  Tant qu'aucune question n'est labellisée, elles sont toutes
+ *  considérées comme "moyen" et l'ordre reste équivalent à un shuffle
+ *  classique. Ajoute `difficulty: 1` ou `difficulty: 3` aux questions
+ *  que tu veux clairement positionner.
+ *
+ *  Exemple :
+ *      { image: "...", answer: "lakers", acceptedAnswers: [...], difficulty: 1 }
+ *      { image: "...", answer: "grizzlies", acceptedAnswers: [...], difficulty: 3 }
+ * ========================================================
+ */
+const allQuestions = {
+    athletes: [
+        { image: "images/sportifs_français/manaudou.jpg", answer: "manaudou", difficulty: 1 },
+        { image: "images/sportifs_français/marchand.jpg", answer: "marchand", difficulty: 1 },
+        { image: "images/sportifs_français/dupont.jpg", answer: "dupont", difficulty: 1 },
+        { image: "images/sportifs_français/gasly.jpg", answer: "gasly", difficulty: 1 },
+        { image: "images/sportifs_français/giroud.jpg", answer: "giroud", difficulty: 1 },
+        { image: "images/sportifs_français/henry.jpg", answer: "henry", difficulty: 1 },
+        { image: "images/sportifs_français/karabatic.jpg", answer: "karabatic", difficulty: 1 },
+        { image: "images/sportifs_français/lacourt.jpg", answer: "lacourt", difficulty: 1 },
+        { image: "images/sportifs_français/loeb.jpg", answer: "loeb", difficulty: 1 },
+        { image: "images/sportifs_français/mbappe.jpg", answer: "mbappe", difficulty: 1 },
+        { image: "images/sportifs_français/monflis.jpg", answer: "monflis", difficulty: 1 },
+        { image: "images/sportifs_français/parker.jpg", answer: "parker", difficulty: 1 },
+        { image: "images/sportifs_français/riner.jpg", answer: "riner", difficulty: 1 },
+        { image: "images/sportifs_français/wembanyama.jpg", answer: "wembanyama", difficulty: 1 },
+        { image: "images/sportifs_français/zizou.jpg", answer: "zidane", difficulty: 1 },
+        { image: "images/sportifs_français/agbegnenou.jpg", answer: "agbegnenou", difficulty: 2 },
+        { image: "images/sportifs_français/alaphilippe.jpg", answer: "alaphilippe", difficulty: 2 },
+        { image: "images/sportifs_français/biellebiarrey.jpg", answer: "bielle biarrey", difficulty: 2 },
+        { image: "images/sportifs_français/ferrandprevot.jpg", answer: "ferrand prevot", difficulty: 2 },
+        { image: "images/sportifs_français/fils.jpg", answer: "fils", difficulty: 2 },
+        { image: "images/sportifs_français/garcia.jpg", answer: "garcia", difficulty: 2 },
+        { image: "images/sportifs_français/hadjar.jpg", answer: "hadjar", difficulty: 2 },
+        { image: "images/sportifs_français/mayer.jpg", answer: "mayer", difficulty: 2 },
+        { image: "images/sportifs_français/ocon.jpg", answer: "ocon", difficulty: 2 },
+        { image: "images/sportifs_français/pinot.jpg", answer: "pinot", difficulty: 2 },
+        { image: "images/sportifs_français/prost.jpg", answer: "prost", difficulty: 2 },
+        { image: "images/sportifs_français/seixas.jpg", answer: "seixas", difficulty: 2 },
+        { image: "images/sportifs_français/tsonga.jpg", answer: "tsonga", difficulty: 2 },
+        { image: "images/sportifs_français/yoka.jpg", answer: "yoka", difficulty: 2 },
+        { image: "images/sportifs_français/fillonmaillet.jpg", answer: "fillon maillet", difficulty: 3 },
+        { image: "images/sportifs_français/jeanmonnot.jpg", answer: "jeanmonnot", difficulty: 3 },
+        { image: "images/sportifs_français/simon.jpg", answer: "simon", difficulty: 3 },
+
+    ],
+
+    stades: [
+        { image: "images/stades/stade_de_france.jpg", answer: "stade de france", difficulty: 1 },
+        { image: "images/stades/stade_groupama_stadium.jpg", answer: "groupama stadium", difficulty: 1 },
+        { image: "images/stades/stade_parc_des_princes.jpg", answer: "parc des princes", difficulty: 1 },
+        { image: "images/stades/stade_velodrome.jpg", answer: "velodrome", difficulty: 1 },
+        { image: "images/stades/stade_geoffroy_guichard.jpg", answer: "geoffroy guichard", difficulty: 2 },
+        { image: "images/stades/stade_jean_bouin.jpg", answer: "jean bouin", difficulty: 2 },
+        { image: "images/stades/stade_allianz_riviera.jpg", answer: "allianz riviera", difficulty: 2 },
+        { image: "images/stades/stade_de_la_beaujoire.jpg", answer: "beaujoire", difficulty: 2 },
+        { image: "images/stades/stade_de_toulouse.jpg", answer: "stadium", difficulty: 2 },
+        { image: "images/stades/stade_felix_bollaert.jpg", answer: "felix bollaert", difficulty: 2 },
+        { image: "images/stades/stade_oceane.jpg", answer: "oceane", difficulty: 2 },
+        { image: "images/stades/stade_pierre_mauroy.jpg", answer: "pierre mauroy", difficulty: 2 },
+        { image: "images/stades/stade_roazhon_park.jpg", answer: "roazhon park", difficulty: 2 },
+        { image: "images/stades/stade_marcel_deflandre.jpg", answer: "marcel deflandre", difficulty: 3 },
+        { image: "images/stades/stade_saint_symphorien.jpg", answer: "saint symphorien", difficulty: 3 },
+    ],
+
+    logosbundesliga: [
+        { image: "images/logos_bundesliga/dortmund.png", answer: "dortmund", acceptedAnswers: ["dortmund", "borussia dortmund", "bvb"], difficulty: 1 },
+        { image: "images/logos_bundesliga/leipzig.png", answer: "leipzig", acceptedAnswers: ["leipzig", "rb leipzig"], difficulty: 1 },
+        { image: "images/logos_bundesliga/munich.png", answer: "munich", acceptedAnswers: ["munich", "munchen", "bayern", "bayern munich", "fc bayern"], difficulty: 1 },
+        { image: "images/logos_bundesliga/wolfsburg.png", answer: "wolfsburg", acceptedAnswers: ["wolfsburg", "vfl wolfsburg"], difficulty: 1 },
+        { image: "images/logos_bundesliga/frankfort.png", answer: "frankfort", acceptedAnswers: ["frankfort", "francfort", "frankfurt", "eintracht francfort", "eintracht frankfurt", "eintracht"], difficulty: 2 },
+        { image: "images/logos_bundesliga/leverkusen.png", answer: "leverkusen", acceptedAnswers: ["leverkusen", "bayer leverkusen", "bayer"], difficulty: 2 },
+        { image: "images/logos_bundesliga/stuttgart.png", answer: "stuttgart", acceptedAnswers: ["stuttgart", "vfb stuttgart"], difficulty: 2 },
+        { image: "images/logos_bundesliga/breme.png", answer: "breme", acceptedAnswers: ["breme", "bremen", "werder breme", "werder bremen", "werder"], difficulty: 2 },
+        { image: "images/logos_bundesliga/cologne.png", answer: "cologne", acceptedAnswers: ["cologne", "koln", "fc cologne", "fc koln"], difficulty: 2 },
+        { image: "images/logos_bundesliga/fribourg.png", answer: "fribourg", acceptedAnswers: ["fribourg", "freiburg", "sc fribourg", "sc freiburg"], difficulty: 2 },
+        { image: "images/logos_bundesliga/hambourg.png", answer: "hambourg", acceptedAnswers: ["hambourg", "hambourg sv", "hamburg", "hamburger sv", "hsv"], difficulty: 2 },
+        { image: "images/logos_bundesliga/hoffenheim.png", answer: "hoffenheim", acceptedAnswers: ["hoffenheim", "tsg hoffenheim"], difficulty: 2 },
+        { image: "images/logos_bundesliga/monchengladbach.png", answer: "monchengladbach", acceptedAnswers: ["monchengladbach", "moenchengladbach", "borussia monchengladbach", "gladbach"], difficulty: 2 },
+        { image: "images/logos_bundesliga/mayence.png", answer: "mayence", acceptedAnswers: ["mayence", "mainz", "mainz 05", "fsv mainz"], difficulty: 2 },
+        { image: "images/logos_bundesliga/union_berlin.png", answer: "union berlin", acceptedAnswers: ["union berlin", "union_berlin", "berlin", "fc union berlin"], difficulty: 2 },
+        { image: "images/logos_bundesliga/augsbourg.png", answer: "augsbourg", acceptedAnswers: ["augsbourg", "augsburg", "fc augsburg"], difficulty: 3 },
+        { image: "images/logos_bundesliga/heidenheim.png", answer: "heidenheim", acceptedAnswers: ["heidenheim", "fc heidenheim"], difficulty: 3 },
+        { image: "images/logos_bundesliga/st_pauli.png", answer: "st pauli", acceptedAnswers: ["st pauli", "st_pauli", "saint pauli", "fc st pauli"], difficulty: 3 },
+    ],
+
+    logoslaliga: [
+        { image: "images/logos_laliga/atletico_madrid.png", answer: "atletico madrid", acceptedAnswers: ["atletico madrid", "atletico", "atletico de madrid"], difficulty: 1 },
+        { image: "images/logos_laliga/barcelone.png", answer: "barcelone", acceptedAnswers: ["barcelone", "barcelona", "fc barcelone", "fc barcelona", "barca"], difficulty: 1 },
+        { image: "images/logos_laliga/real_madrid.png", answer: "real madrid", acceptedAnswers: ["real madrid", "real", "madrid"], difficulty: 1 },
+        { image: "images/logos_laliga/bilbao.png", answer: "bilbao", acceptedAnswers: ["bilbao", "athletic bilbao", "athletic club"], difficulty: 2 },
+        { image: "images/logos_laliga/fc_seville.png", answer: "seville", acceptedAnswers: ["seville", "fc seville", "sevilla", "sevilla fc"], difficulty: 2 },
+        { image: "images/logos_laliga/real_sociedad.png", answer: "real sociedad", acceptedAnswers: ["real sociedad", "sociedad", "san sebastian"], difficulty: 2 },
+        { image: "images/logos_laliga/valence.png", answer: "valence", acceptedAnswers: ["valence", "valencia", "valencia cf", "valence cf"], difficulty: 2 },
+        { image: "images/logos_laliga/villareal.png", answer: "villareal", acceptedAnswers: ["villareal", "villarreal", "villarreal cf"], difficulty: 2 },
+        { image: "images/logos_laliga/betis_seville.png", answer: "betis", acceptedAnswers: ["betis", "betis seville", "real betis"], difficulty: 2 },
+        { image: "images/logos_laliga/celta_vigo.png", answer: "celta vigo", acceptedAnswers: ["celta vigo", "celta", "vigo", "celta de vigo"], difficulty: 2 },
+        { image: "images/logos_laliga/espagnol_barcelone.png", answer: "espanyol", acceptedAnswers: ["espanyol", "espagnol", "espagnol barcelone", "espanyol barcelone", "rcd espanyol"], difficulty: 2 },
+        { image: "images/logos_laliga/getafe.png", answer: "getafe", acceptedAnswers: ["getafe", "getafe cf"], difficulty: 2 },
+        { image: "images/logos_laliga/girone.png", answer: "girone", acceptedAnswers: ["girone", "girona", "girona fc"], difficulty: 2 },
+        { image: "images/logos_laliga/majorque.png", answer: "majorque", acceptedAnswers: ["majorque", "majorca", "mallorca", "mallorque", "rcd mallorca"], difficulty: 2 },
+        { image: "images/logos_laliga/valladolid.png", answer: "valladolid", acceptedAnswers: ["valladolid", "real valladolid"], difficulty: 2 },
+        { image: "images/logos_laliga/cadix.png", answer: "cadix", acceptedAnswers: ["cadix", "cadiz", "cadix cf"], difficulty: 3 },
+        { image: "images/logos_laliga/elche.png", answer: "elche", acceptedAnswers: ["elche", "elche cf"], difficulty: 3 },
+        { image: "images/logos_laliga/osasuna.png", answer: "osasuna", acceptedAnswers: ["osasuna", "ca osasuna", "pampelune"], difficulty: 3 },
+        { image: "images/logos_laliga/rayo_vallecano.png", answer: "rayo vallecano", acceptedAnswers: ["rayo vallecano", "rayo", "vallecano"], difficulty: 3 },
+    ],
+
+    logosligue1: [
+        { image: "images/logos_ligue1/lyon.png", answer: "lyon", acceptedAnswers: ["lyon", "ol", "olympique lyonnais"], difficulty: 1 },
+        { image: "images/logos_ligue1/marseille.png", answer: "marseille", acceptedAnswers: ["marseille", "om", "olympique de marseille"], difficulty: 1 },
+        { image: "images/logos_ligue1/monaco.png", answer: "monaco", acceptedAnswers: ["monaco", "as monaco"], difficulty: 1 },
+        { image: "images/logos_ligue1/paris.png", answer: "paris", acceptedAnswers: ["paris", "psg", "paris saint germain", "paris sg"], difficulty: 1 },
+        { image: "images/logos_ligue1/auxerre.png", answer: "auxerre", acceptedAnswers: ["auxerre", "aj auxerre"], difficulty: 2 },
+        { image: "images/logos_ligue1/lille.png", answer: "lille", acceptedAnswers: ["lille", "losc", "losc lille"], difficulty: 2 },
+        { image: "images/logos_ligue1/paris_fc.png", answer: "paris fc", acceptedAnswers: ["paris fc", "pfc"], difficulty: 2 },
+        { image: "images/logos_ligue1/angers.png", answer: "angers", acceptedAnswers: ["angers", "sco angers", "angers sco"], difficulty: 2 },
+        { image: "images/logos_ligue1/brest.png", answer: "brest", acceptedAnswers: ["brest", "stade brestois"], difficulty: 2 },
+        { image: "images/logos_ligue1/le_havre.png", answer: "le havre", acceptedAnswers: ["le havre", "havre", "hac"], difficulty: 2 },
+        { image: "images/logos_ligue1/lens.png", answer: "lens", acceptedAnswers: ["lens", "rc lens"], difficulty: 2 },
+        { image: "images/logos_ligue1/lorient.png", answer: "lorient", acceptedAnswers: ["lorient", "fc lorient"], difficulty: 2 },
+        { image: "images/logos_ligue1/nantes.png", answer: "nantes", acceptedAnswers: ["nantes", "fc nantes"], difficulty: 2 },
+        { image: "images/logos_ligue1/nice.png", answer: "nice", acceptedAnswers: ["nice", "ogc nice"], difficulty: 2 },
+        { image: "images/logos_ligue1/rennes.png", answer: "rennes", acceptedAnswers: ["rennes", "stade rennais"], difficulty: 2 },
+        { image: "images/logos_ligue1/strasbourg.png", answer: "strasbourg", acceptedAnswers: ["strasbourg", "rc strasbourg", "rcs"], difficulty: 2 },
+        { image: "images/logos_ligue1/toulouse.png", answer: "toulouse", acceptedAnswers: ["toulouse", "tfc", "toulouse fc"], difficulty: 2 },
+        { image: "images/logos_ligue1/metz.png", answer: "metz", acceptedAnswers: ["metz", "fc metz"], difficulty: 3 },
+    ],
+
+    logosmlb: [
+        { image: "images/logos_mlb/dodgers.png", answer: "dodgers", acceptedAnswers: ["dodgers", "los angeles dodgers", "la dodgers"], difficulty: 1 },
+        { image: "images/logos_mlb/red_sox.png", answer: "red sox", acceptedAnswers: ["red sox", "boston red sox", "boston"], difficulty: 1 },
+        { image: "images/logos_mlb/yankees.png", answer: "yankees", acceptedAnswers: ["yankees", "new york yankees", "ny yankees"], difficulty: 1 },
+        { image: "images/logos_mlb/angels.png", answer: "angels", acceptedAnswers: ["angels", "los angeles angels", "anaheim angels", "la angels"], difficulty: 2 },
+        { image: "images/logos_mlb/astros.png", answer: "astros", acceptedAnswers: ["astros", "houston astros", "houston"], difficulty: 2 },
+        { image: "images/logos_mlb/athletics.png", answer: "athletics", acceptedAnswers: ["athletics", "oakland athletics", "oakland"], difficulty: 2 },
+        { image: "images/logos_mlb/giants.png", answer: "giants", acceptedAnswers: ["giants", "san francisco giants", "sf giants"], difficulty: 2 },
+        { image: "images/logos_mlb/mets.png", answer: "mets", acceptedAnswers: ["mets", "new york mets", "ny mets"], difficulty: 2 },
+        { image: "images/logos_mlb/orioles.png", answer: "orioles", acceptedAnswers: ["orioles", "baltimore orioles", "baltimore"], difficulty: 2 },
+        { image: "images/logos_mlb/phillies.png", answer: "phillies", acceptedAnswers: ["phillies", "philadelphia phillies", "philadelphia", "philadelphie"], difficulty: 2 },
+        { image: "images/logos_mlb/pirates.png", answer: "pirates", acceptedAnswers: ["pirates", "pittsburgh pirates", "pittsburgh"], difficulty: 2 },
+        { image: "images/logos_mlb/rays.png", answer: "rays", acceptedAnswers: ["rays", "tampa bay rays", "tampa bay", "tampa"], difficulty: 2 },
+        { image: "images/logos_mlb/white_sox.png", answer: "white sox", acceptedAnswers: ["white sox", "chicago white sox"], difficulty: 2 },
+        { image: "images/logos_mlb/blue_jays.png", answer: "blue jays", acceptedAnswers: ["blue jays", "toronto blue jays", "toronto"], difficulty: 3 },
+        { image: "images/logos_mlb/braves.png", answer: "braves", acceptedAnswers: ["braves", "atlanta braves", "atlanta"], difficulty: 3 },
+        { image: "images/logos_mlb/brewers.png", answer: "brewers", acceptedAnswers: ["brewers", "milwaukee brewers", "milwaukee"], difficulty: 3 },
+        { image: "images/logos_mlb/cardinals.png", answer: "cardinals", acceptedAnswers: ["cardinals", "st louis cardinals", "saint louis cardinals"], difficulty: 3 },
+        { image: "images/logos_mlb/cubs.png", answer: "cubs", acceptedAnswers: ["cubs", "chicago cubs"], difficulty: 3 },
+        { image: "images/logos_mlb/diamondbacks.png", answer: "diamondbacks", acceptedAnswers: ["diamondbacks", "arizona diamondbacks", "arizona", "dbacks"], difficulty: 3 },
+        { image: "images/logos_mlb/guardians.png", answer: "guardians", acceptedAnswers: ["guardians", "cleveland guardians", "cleveland"], difficulty: 3 },
+        { image: "images/logos_mlb/mariners.png", answer: "mariners", acceptedAnswers: ["mariners", "seattle mariners", "seattle"], difficulty: 3 },
+        { image: "images/logos_mlb/marlins.png", answer: "marlins", acceptedAnswers: ["marlins", "miami marlins", "miami"], difficulty: 3 },
+        { image: "images/logos_mlb/nationals.png", answer: "nationals", acceptedAnswers: ["nationals", "washington nationals", "washington", "nats"], difficulty: 3 },
+        { image: "images/logos_mlb/padres.png", answer: "padres", acceptedAnswers: ["padres", "san diego padres", "san diego"], difficulty: 3 },
+        { image: "images/logos_mlb/rangers.png", answer: "rangers", acceptedAnswers: ["rangers", "texas rangers", "texas"], difficulty: 3 },
+        { image: "images/logos_mlb/reds.png", answer: "reds", acceptedAnswers: ["reds", "cincinnati reds", "cincinnati"], difficulty: 3 },
+        { image: "images/logos_mlb/rockies.png", answer: "rockies", acceptedAnswers: ["rockies", "colorado rockies", "colorado"], difficulty: 3 },
+        { image: "images/logos_mlb/royals.png", answer: "royals", acceptedAnswers: ["royals", "kansas city royals", "kansas city"], difficulty: 3 },
+        { image: "images/logos_mlb/tigers.png", answer: "tigers", acceptedAnswers: ["tigers", "detroit tigers", "detroit"], difficulty: 3 },
+        { image: "images/logos_mlb/twins.png", answer: "twins", acceptedAnswers: ["twins", "minnesota twins", "minnesota"], difficulty: 3 },
+    ],
+
+    logosmls: [
+        { image: "images/logos_mls/inter_miami.png", answer: "inter miami", acceptedAnswers: ["inter miami", "miami", "inter miami cf"], difficulty: 1 },
+        { image: "images/logos_mls/la_fc.png", answer: "la fc", acceptedAnswers: ["la fc", "los angeles fc", "lafc"], difficulty: 1 },
+        { image: "images/logos_mls/la_galaxy.png", answer: "la galaxy", acceptedAnswers: ["la galaxy", "los angeles galaxy", "galaxy"], difficulty: 1 },
+        { image: "images/logos_mls/new_york_city.png", answer: "new york city", acceptedAnswers: ["new york city", "nycfc", "new york city fc", "nyc"], difficulty: 1 },
+        { image: "images/logos_mls/red_bulls_new_york.png", answer: "red bulls", acceptedAnswers: ["red bulls", "new york red bulls", "ny red bulls", "red bulls new york"], difficulty: 1 },
+        { image: "images/logos_mls/orlando.png", answer: "orlando", acceptedAnswers: ["orlando", "orlando city", "orlando city sc"], difficulty: 2 },
+        { image: "images/logos_mls/atlanta.png", answer: "atlanta", acceptedAnswers: ["atlanta", "atlanta united", "atlanta united fc"], difficulty: 2 },
+        { image: "images/logos_mls/columbus.png", answer: "columbus", acceptedAnswers: ["columbus", "columbus crew", "crew"], difficulty: 2 },
+        { image: "images/logos_mls/dallas.png", answer: "dallas", acceptedAnswers: ["dallas", "fc dallas"], difficulty: 2 },
+        { image: "images/logos_mls/dc_united.png", answer: "dc united", acceptedAnswers: ["dc united", "d.c. united", "washington", "dc"], difficulty: 2 },
+        { image: "images/logos_mls/kansas_city.png", answer: "kansas city", acceptedAnswers: ["kansas city", "sporting kansas city", "sporting kc", "skc"], difficulty: 2 },
+        { image: "images/logos_mls/montreal.png", answer: "montreal", acceptedAnswers: ["montreal", "cf montreal", "club de foot montreal"], difficulty: 2 },
+        { image: "images/logos_mls/nashville.png", answer: "nashville", acceptedAnswers: ["nashville", "nashville sc"], difficulty: 2 },
+        { image: "images/logos_mls/new_england.png", answer: "new england", acceptedAnswers: ["new england", "new england revolution", "revolution"], difficulty: 2 },
+        { image: "images/logos_mls/philadelphie.png", answer: "philadelphie", acceptedAnswers: ["philadelphie", "philadelphia", "philadelphia union", "union"], difficulty: 2 },
+        { image: "images/logos_mls/portland.png", answer: "portland", acceptedAnswers: ["portland", "portland timbers", "timbers"], difficulty: 2 },
+        { image: "images/logos_mls/salt_lake.png", answer: "salt lake", acceptedAnswers: ["salt lake", "real salt lake", "rsl", "salt lake city"], difficulty: 2 },
+        { image: "images/logos_mls/san_diego.png", answer: "san diego", acceptedAnswers: ["san diego", "san diego fc"], difficulty: 2 },
+        { image: "images/logos_mls/san_jose.png", answer: "san jose", acceptedAnswers: ["san jose", "san jose earthquakes", "earthquakes"], difficulty: 2 },
+        { image: "images/logos_mls/seattle.png", answer: "seattle", acceptedAnswers: ["seattle", "seattle sounders", "sounders", "seattle sounders fc"], difficulty: 2 },
+        { image: "images/logos_mls/st_louis.png", answer: "st louis", acceptedAnswers: ["st louis", "saint louis", "st louis city", "st louis city sc"], difficulty: 2 },
+        { image: "images/logos_mls/toronto.png", answer: "toronto", acceptedAnswers: ["toronto", "toronto fc", "tfc"], difficulty: 2 },
+        { image: "images/logos_mls/vancouver.png", answer: "vancouver", acceptedAnswers: ["vancouver", "vancouver whitecaps", "whitecaps"], difficulty: 2 },
+        { image: "images/logos_mls/austin.png", answer: "austin", acceptedAnswers: ["austin", "austin fc"], difficulty: 3 },
+        { image: "images/logos_mls/charlotte.png", answer: "charlotte", acceptedAnswers: ["charlotte", "charlotte fc"], difficulty: 3 },
+        { image: "images/logos_mls/chicago.png", answer: "chicago", acceptedAnswers: ["chicago", "chicago fire", "chicago fire fc", "fire"], difficulty: 3 },
+        { image: "images/logos_mls/cincinnati.png", answer: "cincinnati", acceptedAnswers: ["cincinnati", "fc cincinnati"], difficulty: 3 },
+        { image: "images/logos_mls/colorado.png", answer: "colorado", acceptedAnswers: ["colorado", "colorado rapids", "rapids"], difficulty: 3 },
+        { image: "images/logos_mls/houston.png", answer: "houston", acceptedAnswers: ["houston", "houston dynamo", "dynamo", "houston dynamo fc"], difficulty: 3 },
+        { image: "images/logos_mls/minnesota.png", answer: "minnesota", acceptedAnswers: ["minnesota", "minnesota united", "minnesota united fc", "loons"], difficulty: 3 },
+    ],
+
+    logosnationsrugby: [
+        { image: "images/logos_nations_rugby/afrique_du_sud.png", answer: "afrique du sud", acceptedAnswers: ["afrique du sud", "south africa", "springboks"], difficulty: 1 },
+        { image: "images/logos_nations_rugby/angleterre.png", answer: "angleterre", acceptedAnswers: ["angleterre", "england", "xv de la rose"], difficulty: 1 },
+        { image: "images/logos_nations_rugby/australie.png", answer: "australie", acceptedAnswers: ["australie", "australia", "wallabies"], difficulty: 1 },
+        { image: "images/logos_nations_rugby/france.png", answer: "france", acceptedAnswers: ["france", "xv de france", "bleus", "les bleus"], difficulty: 1 },
+        { image: "images/logos_nations_rugby/irlande.png", answer: "irlande", acceptedAnswers: ["irlande", "ireland"], difficulty: 1 },
+        { image: "images/logos_nations_rugby/nouvelle_zelande.png", answer: "nouvelle zelande", acceptedAnswers: ["nouvelle zelande", "new zealand", "all blacks", "blacks"], difficulty: 1 },
+        { image: "images/logos_nations_rugby/italie.png", answer: "italie", acceptedAnswers: ["italie", "italy", "azzurri"], difficulty: 2 },
+        { image: "images/logos_nations_rugby/argentine.png", answer: "argentine", acceptedAnswers: ["argentine", "argentina", "pumas", "los pumas"], difficulty: 2 },
+        { image: "images/logos_nations_rugby/ecosse.png", answer: "ecosse", acceptedAnswers: ["ecosse", "scotland"], difficulty: 2 },
+        { image: "images/logos_nations_rugby/fidji.png", answer: "fidji", acceptedAnswers: ["fidji", "fiji", "flying fijians"], difficulty: 2 },
+        { image: "images/logos_nations_rugby/japon.png", answer: "japon", acceptedAnswers: ["japon", "japan", "brave blossoms"], difficulty: 2 },
+        { image: "images/logos_nations_rugby/pays_de_galles.png", answer: "pays de galles", acceptedAnswers: ["pays de galles", "wales"], difficulty: 2 },
+        { image: "images/logos_nations_rugby/bresil.png", answer: "bresil", acceptedAnswers: ["bresil", "brazil", "tupis"], difficulty: 3 },
+        { image: "images/logos_nations_rugby/canada.png", answer: "canada", acceptedAnswers: ["canada"], difficulty: 3 },
+        { image: "images/logos_nations_rugby/etats_unis.png", answer: "etats unis", acceptedAnswers: ["etats unis", "usa", "united states", "eagles"], difficulty: 3 },
+        { image: "images/logos_nations_rugby/georgie.png", answer: "georgie", acceptedAnswers: ["georgie", "georgia", "lelos"], difficulty: 3 },
+        { image: "images/logos_nations_rugby/namibie.png", answer: "namibie", acceptedAnswers: ["namibie", "namibia"], difficulty: 3 },
+        { image: "images/logos_nations_rugby/portugal.png", answer: "portugal", acceptedAnswers: ["portugal", "lobos"], difficulty: 3 },
+        { image: "images/logos_nations_rugby/roumanie.png", answer: "roumanie", acceptedAnswers: ["roumanie", "romania", "oaks"], difficulty: 3 },
+        { image: "images/logos_nations_rugby/samoa.png", answer: "samoa", acceptedAnswers: ["samoa", "manu samoa"], difficulty: 3 }
+    ],
+
+    logosnba: [
+        { image: "images/logos_nba/bulls.png", answer: "bulls", acceptedAnswers: ["bulls", "chicago bulls"], difficulty: 1 },
+        { image: "images/logos_nba/celtics.png", answer: "celtics", acceptedAnswers: ["celtics", "boston celtics", "boston"], difficulty: 1 },
+        { image: "images/logos_nba/heat.png", answer: "heat", acceptedAnswers: ["heat", "miami heat", "miami"], difficulty: 1 },
+        { image: "images/logos_nba/knicks.png", answer: "knicks", acceptedAnswers: ["knicks", "new york knicks", "ny knicks"], difficulty: 1 },
+        { image: "images/logos_nba/lakers.png", answer: "lakers", acceptedAnswers: ["lakers", "los angeles lakers", "la lakers"], difficulty: 1 },
+        { image: "images/logos_nba/spurs.png", answer: "spurs", acceptedAnswers: ["spurs", "san antonio spurs", "san antonio"], difficulty: 1 },
+        { image: "images/logos_nba/warriors.png", answer: "warriors", acceptedAnswers: ["warriors", "golden state warriors", "golden state", "gsw"], difficulty: 1 },
+        { image: "images/logos_nba/bucks.png", answer: "bucks", acceptedAnswers: ["bucks", "milwaukee bucks", "milwaukee"], difficulty: 2 },
+        { image: "images/logos_nba/clippers.png", answer: "clippers", acceptedAnswers: ["clippers", "los angeles clippers", "la clippers"], difficulty: 2 },
+        { image: "images/logos_nba/nets.png", answer: "nets", acceptedAnswers: ["nets", "brooklyn nets", "brooklyn"], difficulty: 2 },
+        { image: "images/logos_nba/nuggets.png", answer: "nuggets", acceptedAnswers: ["nuggets", "denver nuggets", "denver"], difficulty: 2 },
+        { image: "images/logos_nba/pacers.png", answer: "pacers", acceptedAnswers: ["pacers", "indiana pacers", "indiana", "indianapolis"], difficulty: 2 },
+        { image: "images/logos_nba/pistons.png", answer: "pistons", acceptedAnswers: ["pistons", "detroit pistons", "detroit"], difficulty: 2 },
+        { image: "images/logos_nba/raptors.png", answer: "raptors", acceptedAnswers: ["raptors", "toronto raptors", "toronto"], difficulty: 2 },
+        { image: "images/logos_nba/rockets.png", answer: "rockets", acceptedAnswers: ["rockets", "houston rockets", "houston"], difficulty: 2 },
+        { image: "images/logos_nba/sixers.png", answer: "sixers", acceptedAnswers: ["sixers", "philadelphia 76ers", "76ers", "philadelphia", "philadelphie"], difficulty: 2 },
+        { image: "images/logos_nba/thunder.png", answer: "thunder", acceptedAnswers: ["thunder", "oklahoma city thunder", "oklahoma city", "okc"], difficulty: 2 },
+        { image: "images/logos_nba/cavaliers.png", answer: "cavaliers", acceptedAnswers: ["cavaliers", "cleveland cavaliers", "cleveland", "cavs"], difficulty: 3 },
+        { image: "images/logos_nba/grizzlies.png", answer: "grizzlies", acceptedAnswers: ["grizzlies", "memphis grizzlies", "memphis"], difficulty: 3 },
+        { image: "images/logos_nba/hawks.png", answer: "hawks", acceptedAnswers: ["hawks", "atlanta hawks", "atlanta"], difficulty: 3 },
+        { image: "images/logos_nba/hornets.png", answer: "hornets", acceptedAnswers: ["hornets", "charlotte hornets", "charlotte"], difficulty: 3 },
+        { image: "images/logos_nba/jazz.png", answer: "jazz", acceptedAnswers: ["jazz", "utah jazz", "utah"], difficulty: 3 },
+        { image: "images/logos_nba/kings.png", answer: "kings", acceptedAnswers: ["kings", "sacramento kings", "sacramento"], difficulty: 3 },
+        { image: "images/logos_nba/magic.png", answer: "magic", acceptedAnswers: ["magic", "orlando magic", "orlando"], difficulty: 3 },
+        { image: "images/logos_nba/mavericks.png", answer: "mavericks", acceptedAnswers: ["mavericks", "dallas mavericks", "dallas", "mavs"], difficulty: 3 },
+        { image: "images/logos_nba/pelicans.png", answer: "pelicans", acceptedAnswers: ["pelicans", "new orleans pelicans", "new orleans"], difficulty: 3 },
+        { image: "images/logos_nba/suns.png", answer: "suns", acceptedAnswers: ["suns", "phoenix suns", "phoenix"], difficulty: 3 },
+        { image: "images/logos_nba/timberwolves.png", answer: "timberwolves", acceptedAnswers: ["timberwolves", "minnesota timberwolves", "minnesota", "wolves"], difficulty: 3 },
+        { image: "images/logos_nba/trail_blazers.png", answer: "trail blazers", acceptedAnswers: ["trail blazers", "blazers", "portland trail blazers", "portland"], difficulty: 3 },
+        { image: "images/logos_nba/wizards.png", answer: "wizards", acceptedAnswers: ["wizards", "washington wizards", "washington"], difficulty: 3 }
+    ],
+
+    logosnfl: [
+        { image: "images/logos_nfl/cowboys.png", answer: "cowboys", acceptedAnswers: ["cowboys", "dallas cowboys", "dallas"], difficulty: 1 },
+        { image: "images/logos_nfl/dolphins.png", answer: "dolphins", acceptedAnswers: ["dolphins", "miami dolphins", "miami"], difficulty: 1 },
+        { image: "images/logos_nfl/eagles.png", answer: "eagles", acceptedAnswers: ["eagles", "philadelphia eagles", "philadelphia", "philadelphie"], difficulty: 1 },
+        { image: "images/logos_nfl/giants.png", answer: "giants", acceptedAnswers: ["giants", "new york giants", "ny giants"], difficulty: 1 },
+        { image: "images/logos_nfl/patriots.png", answer: "patriots", acceptedAnswers: ["patriots", "new england patriots", "new england", "pats"], difficulty: 1 },
+        { image: "images/logos_nfl/bengals.png", answer: "bengals", acceptedAnswers: ["bengals", "cincinnati bengals", "cincinnati"], difficulty: 2 },
+        { image: "images/logos_nfl/bills.png", answer: "bills", acceptedAnswers: ["bills", "buffalo bills", "buffalo"], difficulty: 2 },
+        { image: "images/logos_nfl/broncos.png", answer: "broncos", acceptedAnswers: ["broncos", "denver broncos", "denver"], difficulty: 2 },
+        { image: "images/logos_nfl/browns.png", answer: "browns", acceptedAnswers: ["browns", "cleveland browns", "cleveland"], difficulty: 2 },
+        { image: "images/logos_nfl/chargers.png", answer: "chargers", acceptedAnswers: ["chargers", "los angeles chargers", "la chargers"], difficulty: 2 },
+        { image: "images/logos_nfl/chiefs.png", answer: "chiefs", acceptedAnswers: ["chiefs", "kansas city chiefs", "kansas city"], difficulty: 2 },
+        { image: "images/logos_nfl/falcons.png", answer: "falcons", acceptedAnswers: ["falcons", "atlanta falcons", "atlanta"], difficulty: 2 },
+        { image: "images/logos_nfl/jaguars.png", answer: "jaguars", acceptedAnswers: ["jaguars", "jacksonville jaguars", "jacksonville"], difficulty: 2 },
+        { image: "images/logos_nfl/jets.png", answer: "jets", acceptedAnswers: ["jets", "new york jets", "ny jets"], difficulty: 2 },
+        { image: "images/logos_nfl/lions.png", answer: "lions", acceptedAnswers: ["lions", "detroit lions", "detroit"], difficulty: 2 },
+        { image: "images/logos_nfl/niners.png", answer: "niners", acceptedAnswers: ["niners", "49ers", "san francisco 49ers", "san francisco"], difficulty: 2 },
+        { image: "images/logos_nfl/packers.png", answer: "packers", acceptedAnswers: ["packers", "green bay packers", "green bay"], difficulty: 2 },
+        { image: "images/logos_nfl/raiders.png", answer: "raiders", acceptedAnswers: ["raiders", "las vegas raiders", "las vegas"], difficulty: 2 },
+        { image: "images/logos_nfl/rams.png", answer: "rams", acceptedAnswers: ["rams", "los angeles rams", "la rams"], difficulty: 2 },
+        { image: "images/logos_nfl/saints.png", answer: "saints", acceptedAnswers: ["saints", "new orleans saints", "new orleans"], difficulty: 2 },
+        { image: "images/logos_nfl/bears.png", answer: "bears", acceptedAnswers: ["bears", "chicago bears", "chicago"], difficulty: 3 },
+        { image: "images/logos_nfl/buccaneers.png", answer: "buccaneers", acceptedAnswers: ["buccaneers", "tampa bay buccaneers", "tampa bay", "tampa", "bucs"], difficulty: 3 },
+        { image: "images/logos_nfl/cardinals.png", answer: "cardinals", acceptedAnswers: ["cardinals", "arizona cardinals", "arizona"], difficulty: 3 },
+        { image: "images/logos_nfl/colts.png", answer: "colts", acceptedAnswers: ["colts", "indianapolis colts", "indianapolis", "indiana"], difficulty: 3 },
+        { image: "images/logos_nfl/commanders.png", answer: "commanders", acceptedAnswers: ["commanders", "washington commanders", "washington"], difficulty: 3 },
+        { image: "images/logos_nfl/panthers.png", answer: "panthers", acceptedAnswers: ["panthers", "carolina panthers", "carolina"], difficulty: 3 },
+        { image: "images/logos_nfl/ravens.png", answer: "ravens", acceptedAnswers: ["ravens", "baltimore ravens", "baltimore"], difficulty: 3 },
+        { image: "images/logos_nfl/seahawks.png", answer: "seahawks", acceptedAnswers: ["seahawks", "seattle seahawks", "seattle"], difficulty: 3 },
+        { image: "images/logos_nfl/steelers.png", answer: "steelers", acceptedAnswers: ["steelers", "pittsburgh steelers", "pittsburgh"], difficulty: 3 },
+        { image: "images/logos_nfl/texans.png", answer: "texans", acceptedAnswers: ["texans", "houston texans", "houston"], difficulty: 3 },
+        { image: "images/logos_nfl/titans.png", answer: "titans", acceptedAnswers: ["titans", "tennessee titans", "tennessee"], difficulty: 3 },
+        { image: "images/logos_nfl/vikings.png", answer: "vikings", acceptedAnswers: ["vikings", "minnesota vikings", "minnesota"], difficulty: 3 }
+    ],
+
+    logosnhl: [
+        { image: "images/logos_nhl/canadiens.png", answer: "canadiens", acceptedAnswers: ["canadiens", "montreal canadiens", "montreal", "habs"], difficulty: 1 },
+        { image: "images/logos_nhl/avalanche.png", answer: "avalanche", acceptedAnswers: ["avalanche", "colorado avalanche", "colorado"], difficulty: 2 },
+        { image: "images/logos_nhl/blackhawks.png", answer: "blackhawks", acceptedAnswers: ["blackhawks", "chicago blackhawks", "chicago"], difficulty: 2 },
+        { image: "images/logos_nhl/blue_jackets.png", answer: "blue jackets", acceptedAnswers: ["blue jackets", "columbus blue jackets", "columbus"], difficulty: 2 },
+        { image: "images/logos_nhl/blues.png", answer: "blues", acceptedAnswers: ["blues", "st louis blues", "saint louis blues"], difficulty: 2 },
+        { image: "images/logos_nhl/bruins.png", answer: "bruins", acceptedAnswers: ["bruins", "boston bruins", "boston"], difficulty: 2 },
+        { image: "images/logos_nhl/canucks.png", answer: "canucks", acceptedAnswers: ["canucks", "vancouver canucks", "vancouver"], difficulty: 2 },
+        { image: "images/logos_nhl/capitals.png", answer: "capitals", acceptedAnswers: ["capitals", "washington capitals", "washington", "caps"], difficulty: 2 },
+        { image: "images/logos_nhl/devils.png", answer: "devils", acceptedAnswers: ["devils", "new jersey devils", "new jersey"], difficulty: 2 },
+        { image: "images/logos_nhl/ducks.png", answer: "ducks", acceptedAnswers: ["ducks", "anaheim ducks", "anaheim"], difficulty: 2 },
+        { image: "images/logos_nhl/flames.png", answer: "flames", acceptedAnswers: ["flames", "calgary flames", "calgary"], difficulty: 2 },
+        { image: "images/logos_nhl/flyers.png", answer: "flyers", acceptedAnswers: ["flyers", "philadelphia flyers", "philadelphia", "philadelphie"], difficulty: 2 },
+        { image: "images/logos_nhl/golden_knights.png", answer: "golden knights", acceptedAnswers: ["golden knights", "vegas golden knights", "vegas", "las vegas", "knights"], difficulty: 2 },
+        { image: "images/logos_nhl/hurricanes.png", answer: "hurricanes", acceptedAnswers: ["hurricanes", "carolina hurricanes", "carolina", "canes"], difficulty: 2 },
+        { image: "images/logos_nhl/islanders.png", answer: "islanders", acceptedAnswers: ["islanders", "new york islanders", "ny islanders", "isles"], difficulty: 2 },
+        { image: "images/logos_nhl/jets.png", answer: "jets", acceptedAnswers: ["jets", "winnipeg jets", "winnipeg"], difficulty: 2 },
+        { image: "images/logos_nhl/kings.png", answer: "kings", acceptedAnswers: ["kings", "los angeles kings", "la kings"], difficulty: 2 },
+        { image: "images/logos_nhl/kraken.png", answer: "kraken", acceptedAnswers: ["kraken", "seattle kraken", "seattle"], difficulty: 2 },
+        { image: "images/logos_nhl/lightning.png", answer: "lightning", acceptedAnswers: ["lightning", "tampa bay lightning", "tampa bay", "tampa", "bolts"], difficulty: 2 },
+        { image: "images/logos_nhl/mammoth.png", answer: "mammoth", acceptedAnswers: ["mammoth", "utah mammoth", "utah"], difficulty: 2 },
+        { image: "images/logos_nhl/maple_leafs.png", answer: "maple leafs", acceptedAnswers: ["maple leafs", "toronto maple leafs", "toronto", "leafs"], difficulty: 2 },
+        { image: "images/logos_nhl/oilers.png", answer: "oilers", acceptedAnswers: ["oilers", "edmonton oilers", "edmonton"], difficulty: 2 },
+        { image: "images/logos_nhl/panthers.png", answer: "panthers", acceptedAnswers: ["panthers", "florida panthers", "florida"], difficulty: 2 },
+        { image: "images/logos_nhl/penguins.png", answer: "penguins", acceptedAnswers: ["penguins", "pittsburgh penguins", "pittsburgh", "pens"], difficulty: 2 },
+        { image: "images/logos_nhl/predators.png", answer: "predators", acceptedAnswers: ["predators", "nashville predators", "nashville", "preds"], difficulty: 2 },
+        { image: "images/logos_nhl/rangers.png", answer: "rangers", acceptedAnswers: ["rangers", "new york rangers", "ny rangers"], difficulty: 2 },
+        { image: "images/logos_nhl/sabres.png", answer: "sabres", acceptedAnswers: ["sabres", "buffalo sabres", "buffalo"], difficulty: 2 },
+        { image: "images/logos_nhl/senators.png", answer: "senators", acceptedAnswers: ["senators", "ottawa senators", "ottawa", "sens"], difficulty: 2 },
+        { image: "images/logos_nhl/sharks.png", answer: "sharks", acceptedAnswers: ["sharks", "san jose sharks", "san jose"], difficulty: 2 },
+        { image: "images/logos_nhl/stars.png", answer: "stars", acceptedAnswers: ["stars", "dallas stars", "dallas"], difficulty: 2 },
+        { image: "images/logos_nhl/wild.png", answer: "wild", acceptedAnswers: ["wild", "minnesota wild", "minnesota"], difficulty: 2 },
+        { image: "images/logos_nhl/wings.png", answer: "red wings", acceptedAnswers: ["red wings", "wings", "detroit red wings", "detroit"], difficulty: 2 }
+    ],
+
+    logosnrl: [
+        { image: "images/logos_nrl/broncos.png", answer: "broncos", acceptedAnswers: ["broncos", "brisbane broncos", "brisbane"], difficulty: 2 },
+        { image: "images/logos_nrl/bulldogs.png", answer: "bulldogs", acceptedAnswers: ["bulldogs", "canterbury bulldogs", "canterbury"], difficulty: 2 },
+        { image: "images/logos_nrl/cowboys.png", answer: "cowboys", acceptedAnswers: ["cowboys", "north queensland cowboys", "north queensland"], difficulty: 2 },
+        { image: "images/logos_nrl/dolphins.png", answer: "dolphins", acceptedAnswers: ["dolphins", "redcliffe dolphins", "redcliffe"], difficulty: 2 },
+        { image: "images/logos_nrl/dragons.png", answer: "dragons", acceptedAnswers: ["dragons", "st george illawarra dragons", "st george"], difficulty: 2 },
+        { image: "images/logos_nrl/eels.png", answer: "eels", acceptedAnswers: ["eels", "parramatta eels", "parramatta"], difficulty: 2 },
+        { image: "images/logos_nrl/knights.png", answer: "knights", acceptedAnswers: ["knights", "newcastle knights", "newcastle"], difficulty: 2 },
+        { image: "images/logos_nrl/panthers.png", answer: "panthers", acceptedAnswers: ["panthers", "penrith panthers", "penrith"], difficulty: 2 },
+        { image: "images/logos_nrl/rabbitohs.png", answer: "rabbitohs", acceptedAnswers: ["rabbitohs", "south sydney rabbitohs", "south sydney"], difficulty: 2 },
+        { image: "images/logos_nrl/raiders.png", answer: "raiders", acceptedAnswers: ["raiders", "canberra raiders", "canberra"], difficulty: 2 },
+        { image: "images/logos_nrl/roosters.png", answer: "roosters", acceptedAnswers: ["roosters", "sydney roosters", "sydney"], difficulty: 2 },
+        { image: "images/logos_nrl/sea_eagles.png", answer: "sea eagles", acceptedAnswers: ["sea eagles", "manly sea eagles", "manly"], difficulty: 2 },
+        { image: "images/logos_nrl/sharks.png", answer: "sharks", acceptedAnswers: ["sharks", "cronulla sharks", "cronulla"], difficulty: 2 },
+        { image: "images/logos_nrl/storm.png", answer: "storm", acceptedAnswers: ["storm", "melbourne storm", "melbourne"], difficulty: 2 },
+        { image: "images/logos_nrl/tigers.png", answer: "tigers", acceptedAnswers: ["tigers", "wests tigers", "west tigers"], difficulty: 2 },
+        { image: "images/logos_nrl/titans.png", answer: "titans", acceptedAnswers: ["titans", "gold coast titans", "gold coast"], difficulty: 2 },
+        { image: "images/logos_nrl/warriors.png", answer: "warriors", acceptedAnswers: ["warriors", "new zealand warriors", "nz warriors"], difficulty: 2 }
+    ],
+
+    logospremierleague: [
+        { image: "images/logos_premier_league/arsenal.png", answer: "arsenal", acceptedAnswers: ["arsenal", "arsenal fc", "gunners"], difficulty: 1 },
+        { image: "images/logos_premier_league/chelsea.png", answer: "chelsea", acceptedAnswers: ["chelsea", "chelsea fc", "blues"], difficulty: 1 },
+        { image: "images/logos_premier_league/liverpool.png", answer: "liverpool", acceptedAnswers: ["liverpool", "liverpool fc", "lfc", "reds"], difficulty: 1 },
+        { image: "images/logos_premier_league/manchester_city.png", answer: "manchester city", acceptedAnswers: ["manchester city", "man city", "manchester", "city", "citizens"], difficulty: 1 },
+        { image: "images/logos_premier_league/manchester_united.png", answer: "manchester united", acceptedAnswers: ["manchester united", "man united", "manchester", "united", "man utd", "mu"], difficulty: 1 },
+        { image: "images/logos_premier_league/tottenham.png", answer: "tottenham", acceptedAnswers: ["tottenham", "tottenham hotspur", "spurs"], difficulty: 1 },
+        { image: "images/logos_premier_league/aston_villa.png", answer: "aston villa", acceptedAnswers: ["aston villa", "villa", "birmingham"], difficulty: 2 },
+        { image: "images/logos_premier_league/bournemouth.png", answer: "bournemouth", acceptedAnswers: ["bournemouth", "afc bournemouth"], difficulty: 2 },
+        { image: "images/logos_premier_league/brighton.png", answer: "brighton", acceptedAnswers: ["brighton", "brighton hove albion", "brighton and hove albion"], difficulty: 2 },
+        { image: "images/logos_premier_league/everton.png", answer: "everton", acceptedAnswers: ["everton", "everton fc", "toffees"], difficulty: 2 },
+        { image: "images/logos_premier_league/fulham.png", answer: "fulham", acceptedAnswers: ["fulham", "fulham fc"], difficulty: 2 },
+        { image: "images/logos_premier_league/newcastle.png", answer: "newcastle", acceptedAnswers: ["newcastle", "newcastle united", "magpies"], difficulty: 2 },
+        { image: "images/logos_premier_league/west_ham.png", answer: "west ham", acceptedAnswers: ["west ham", "west ham united", "hammers"], difficulty: 2 },
+        { image: "images/logos_premier_league/brentford.png", answer: "brentford", acceptedAnswers: ["brentford", "brentford fc"], difficulty: 3 },
+        { image: "images/logos_premier_league/crystal_palace.png", answer: "crystal palace", acceptedAnswers: ["crystal palace", "palace"], difficulty: 3 },
+        { image: "images/logos_premier_league/leeds.png", answer: "leeds", acceptedAnswers: ["leeds", "leeds united"], difficulty: 3 },
+        { image: "images/logos_premier_league/leicester.png", answer: "leicester", acceptedAnswers: ["leicester", "leicester city", "foxes"], difficulty: 3 },
+        { image: "images/logos_premier_league/nottingham_forest.png", answer: "nottingham forest", acceptedAnswers: ["nottingham forest", "nottingham", "forest"], difficulty: 3 },
+        { image: "images/logos_premier_league/southampton.png", answer: "southampton", acceptedAnswers: ["southampton", "saints"], difficulty: 3 },
+        { image: "images/logos_premier_league/wolverhampton.png", answer: "wolverhampton", acceptedAnswers: ["wolverhampton", "wolves", "wolverhampton wanderers"], difficulty: 3 }
+    ],
+
+    logosseriea: [
+        { image: "images/logos_serieA/as_rome.png", answer: "rome", acceptedAnswers: ["rome", "as rome", "as roma", "roma"], difficulty: 1 },
+        { image: "images/logos_serieA/inter.png", answer: "inter", acceptedAnswers: ["inter", "inter milan", "internazionale"], difficulty: 1 },
+        { image: "images/logos_serieA/milan.png", answer: "milan", acceptedAnswers: ["milan", "ac milan", "acm"], difficulty: 1 },
+        { image: "images/logos_serieA/naples.png", answer: "naples", acceptedAnswers: ["naples", "napoli", "ssc napoli"], difficulty: 1 },
+        { image: "images/logos_serieA/turin.png", answer: "juventus", acceptedAnswers: ["juventus", "juve", "turin", "juventus turin"], difficulty: 1 },
+        { image: "images/logos_serieA/bologne.png", answer: "bologne", acceptedAnswers: ["bologne", "bologna", "bologna fc"], difficulty: 2 },
+        { image: "images/logos_serieA/come.png", answer: "come", acceptedAnswers: ["come", "como", "como 1907"], difficulty: 2 },
+        { image: "images/logos_serieA/fiorentina.png", answer: "fiorentina", acceptedAnswers: ["fiorentina", "florence", "acf fiorentina"], difficulty: 2 },
+        { image: "images/logos_serieA/genes.png", answer: "genes", acceptedAnswers: ["genes", "genoa", "genoa cfc"], difficulty: 2 },
+        { image: "images/logos_serieA/lazio_rome.png", answer: "lazio", acceptedAnswers: ["lazio", "lazio rome", "ss lazio", "rome"], difficulty: 2 },
+        { image: "images/logos_serieA/lecce.png", answer: "lecce", acceptedAnswers: ["lecce", "us lecce"], difficulty: 2 },
+        { image: "images/logos_serieA/parme.png", answer: "parme", acceptedAnswers: ["parme", "parma", "parma calcio"], difficulty: 2 },
+        { image: "images/logos_serieA/torino.png", answer: "torino", acceptedAnswers: ["torino", "torino fc"], difficulty: 2 },
+        { image: "images/logos_serieA/udinese.png", answer: "udinese", acceptedAnswers: ["udinese", "udine", "udinese calcio"], difficulty: 2 },
+        { image: "images/logos_serieA/bergame.png", answer: "bergame", acceptedAnswers: ["bergame", "atalanta", "atalanta bergame"], difficulty: 3 },
+        { image: "images/logos_serieA/cagliari.png", answer: "cagliari", acceptedAnswers: ["cagliari", "cagliari calcio"], difficulty: 3 },
+        { image: "images/logos_serieA/cremonese.png", answer: "cremonese", acceptedAnswers: ["cremonese", "us cremonese", "cremone"], difficulty: 3 },
+        { image: "images/logos_serieA/pise.png", answer: "pise", acceptedAnswers: ["pise", "pisa", "pisa sc"], difficulty: 3 },
+        { image: "images/logos_serieA/sassuolo.png", answer: "sassuolo", acceptedAnswers: ["sassuolo", "us sassuolo"], difficulty: 3 },
+        { image: "images/logos_serieA/verone.png", answer: "verone", acceptedAnswers: ["verone", "verona", "hellas verona"], difficulty: 3 }
+    ],
+
+    logostop14: [
+        { image: "images/logos_top14/bordeaux.png", answer: "bordeaux", acceptedAnswers: ["bordeaux", "union bordeaux begles", "ubb", "bordeaux begles"], difficulty: 1 },
+        { image: "images/logos_top14/clermont.png", answer: "clermont", acceptedAnswers: ["clermont", "asm clermont", "asm", "asm clermont auvergne"], difficulty: 1 },
+        { image: "images/logos_top14/la_rochelle.png", answer: "la rochelle", acceptedAnswers: ["la rochelle", "stade rochelais", "rochelais"], difficulty: 1 },
+        { image: "images/logos_top14/paris.png", answer: "paris", acceptedAnswers: ["paris", "stade francais", "stade francais paris", "sfp"], difficulty: 1 },
+        { image: "images/logos_top14/toulouse.png", answer: "toulouse", acceptedAnswers: ["toulouse", "stade toulousain", "st"], difficulty: 1 },
+        { image: "images/logos_top14/racing.png", answer: "racing", acceptedAnswers: ["racing", "racing 92", "racing metro"], difficulty: 2 },
+        { image: "images/logos_top14/toulon.png", answer: "toulon", acceptedAnswers: ["toulon", "rc toulon", "rct"], difficulty: 2 },
+        { image: "images/logos_top14/bayonne.png", answer: "bayonne", acceptedAnswers: ["bayonne", "aviron bayonnais"], difficulty: 2 },
+        { image: "images/logos_top14/castres.png", answer: "castres", acceptedAnswers: ["castres", "castres olympique", "co"], difficulty: 2 },
+        { image: "images/logos_top14/lyon.png", answer: "lyon", acceptedAnswers: ["lyon", "lou", "lou rugby"], difficulty: 2 },
+        { image: "images/logos_top14/montpellier.png", answer: "montpellier", acceptedAnswers: ["montpellier", "mhr", "montpellier herault rugby"], difficulty: 2 },
+        { image: "images/logos_top14/pau.png", answer: "pau", acceptedAnswers: ["pau", "section paloise"], difficulty: 2 },
+        { image: "images/logos_top14/montauban.png", answer: "montauban", acceptedAnswers: ["montauban", "us montauban", "usm"], difficulty: 3 },
+        { image: "images/logos_top14/perpignan.png", answer: "perpignan", acceptedAnswers: ["perpignan", "usap", "usa perpignan"], difficulty: 3 },
+    ],
+
+    voitures: [
+        { image: "images/logos_cars/audi.png", answer: "audi", difficulty: 1 },
+        { image: "images/logos_cars/bmw.png", answer: "bmw", difficulty: 1 },
+        { image: "images/logos_cars/citroen.png", answer: "citroen", difficulty: 1 },
+        { image: "images/logos_cars/ferrari.png", answer: "ferrari", difficulty: 1 },
+        { image: "images/logos_cars/ford.png", answer: "ford", difficulty: 1 },
+        { image: "images/logos_cars/hyundai.png", answer: "hyundai", difficulty: 1 },
+        { image: "images/logos_cars/jeep.png", answer: "jeep", difficulty: 1 },
+        { image: "images/logos_cars/kia.png", answer: "kia", difficulty: 1 },
+        { image: "images/logos_cars/lamborghini.png", answer: "lamborghini", difficulty: 1 },
+        { image: "images/logos_cars/mercedes.png", answer: "mercedes", difficulty: 1 },
+        { image: "images/logos_cars/nissan.png", answer: "nissan", difficulty: 1 },
+        { image: "images/logos_cars/peugeot.png", answer: "peugeot", difficulty: 1 },
+        { image: "images/logos_cars/porsche.png", answer: "porsche", difficulty: 1 },
+        { image: "images/logos_cars/renault.png", answer: "renault", difficulty: 1 },
+        { image: "images/logos_cars/tesla.png", answer: "tesla", difficulty: 1 },
+        { image: "images/logos_cars/toyota.png", answer: "toyota", difficulty: 1 },
+        { image: "images/logos_cars/volkswagen.png", answer: "volkswagen", difficulty: 1 },
+        { image: "images/logos_cars/alfa_romeo.png", answer: "alfa_romeo", difficulty: 2 },
+        { image: "images/logos_cars/fiat.png", answer: "fiat", difficulty: 2 },
+        { image: "images/logos_cars/mazda.png", answer: "mazda", difficulty: 2 },
+        { image: "images/logos_cars/mitsubishi.png", answer: "mitsubishi", difficulty: 2 },
+        { image: "images/logos_cars/opel.png", answer: "opel", difficulty: 2 },
+        { image: "images/logos_cars/seat.png", answer: "seat", difficulty: 2 },
+        { image: "images/logos_cars/skoda.png", answer: "skoda", difficulty: 2 },
+        { image: "images/logos_cars/volvo.png", answer: "volvo", difficulty: 2 },
+        { image: "images/logos_cars/aston_martin.png", answer: "aston_martin", difficulty: 2 },
+        { image: "images/logos_cars/bentley.png", answer: "bentley", difficulty: 2 },
+        { image: "images/logos_cars/bugatti.png", answer: "bugatti", difficulty: 2 },
+        { image: "images/logos_cars/cadillac.png", answer: "cadillac", difficulty: 2 },
+        { image: "images/logos_cars/chevrolet.png", answer: "chevrolet", difficulty: 2 },
+        { image: "images/logos_cars/chrysler.png", answer: "chrysler", difficulty: 2 },
+        { image: "images/logos_cars/corvette.png", answer: "corvette", difficulty: 2 },
+        { image: "images/logos_cars/cupra.png", answer: "cupra", difficulty: 2 },
+        { image: "images/logos_cars/honda.png", answer: "honda", difficulty: 2 },
+        { image: "images/logos_cars/jaguar.png", answer: "jaguar", difficulty: 2 },
+        { image: "images/logos_cars/landrover.png", answer: "landrover", difficulty: 2 },
+        { image: "images/logos_cars/lexus.png", answer: "lexus", difficulty: 2 },
+        { image: "images/logos_cars/maserati.png", answer: "maserati", difficulty: 2 },
+        { image: "images/logos_cars/mclaren.png", answer: "mclaren", difficulty: 2 },
+        { image: "images/logos_cars/mg.png", answer: "mg", difficulty: 2 },
+        { image: "images/logos_cars/mini.png", answer: "mini", difficulty: 2 },
+        { image: "images/logos_cars/polestar.png", answer: "polestar", difficulty: 2 },
+        { image: "images/logos_cars/rollsroyce.png", answer: "rollsroyce", difficulty: 2 },
+        { image: "images/logos_cars/subaru.png", answer: "subaru", difficulty: 2 },
+        { image: "images/logos_cars/suzuki.png", answer: "suzuki", difficulty: 2 },
+        { image: "images/logos_cars/acura.png", answer: "acura", difficulty: 3 },
+        { image: "images/logos_cars/buick.png", answer: "buick", difficulty: 3 },
+        { image: "images/logos_cars/chery.png", answer: "chery", difficulty: 3 },
+        { image: "images/logos_cars/daihatsu.png", answer: "daihatsu", difficulty: 3 },
+        { image: "images/logos_cars/holden.png", answer: "holden", difficulty: 3 },
+        { image: "images/logos_cars/infinity.png", answer: "infinity", difficulty: 3 },
+        { image: "images/logos_cars/koenigsegg.png", answer: "koenigsegg", difficulty: 3 },
+        { image: "images/logos_cars/ldv.png", answer: "ldv", difficulty: 3 },
+        { image: "images/logos_cars/lincoln.png", answer: "lincoln", difficulty: 3 },
+        { image: "images/logos_cars/lotus.png", answer: "lotus", difficulty: 3 },
+        { image: "images/logos_cars/mahindra.png", answer: "mahindra", difficulty: 3 },
+        { image: "images/logos_cars/mustang.png", answer: "mustang", difficulty: 3 },
+        { image: "images/logos_cars/pontiac.png", answer: "pontiac", difficulty: 3 },
+        { image: "images/logos_cars/scion.png", answer: "scion", difficulty: 3 },
+        { image: "images/logos_cars/ssangyong.png", answer: "ssangyong", difficulty: 3 },
+    ],
+
+    politiquefr: [
+        { image: "images/politique_fr/macron.jpg", answer: "macron", difficulty: 2 }
+    ],
+
+    hommesetat: [
+        { image: "images/hommes_etat/obama.jpg", answer: "obama", difficulty: 2 }
+    ],
+
+    drapeaux: [
+            { image: "images/drapeaux/ar.png", answer: "argentine", difficulty: 1 },
+            { image: "images/drapeaux/au.png", answer: "australie", difficulty: 1 },
+            { image: "images/drapeaux/be.png", answer: "belgique", difficulty: 1 },
+            { image: "images/drapeaux/br.png", answer: "bresil", difficulty: 1 },
+            { image: "images/drapeaux/ca.png", answer: "canada", difficulty: 1 },
+            { image: "images/drapeaux/ch.png", answer: "suisse", difficulty: 1 },
+            { image: "images/drapeaux/cn.png", answer: "chine", difficulty: 1 },
+            { image: "images/drapeaux/de.png", answer: "allemagne", difficulty: 1 },
+            { image: "images/drapeaux/dz.png", answer: "algerie", difficulty: 1 },
+            { image: "images/drapeaux/es.png", answer: "espagne", difficulty: 1 },
+            { image: "images/drapeaux/fr.png", answer: "france", difficulty: 1 },
+            { image: "images/drapeaux/gb.png", answer: "royaume uni", difficulty: 1 },
+            { image: "images/drapeaux/gr.png", answer: "grece", difficulty: 1 },
+            { image: "images/drapeaux/it.png", answer: "italie", difficulty: 1 },
+            { image: "images/drapeaux/jp.png", answer: "japon", difficulty: 1 },
+            { image: "images/drapeaux/kp.png", answer: "coree du nord", difficulty: 1 },
+            { image: "images/drapeaux/kr.png", answer: "coree du sud", difficulty: 1 },
+            { image: "images/drapeaux/ma.png", answer: "maroc", difficulty: 1 },
+            { image: "images/drapeaux/mx.png", answer: "mexique", difficulty: 1 },
+            { image: "images/drapeaux/pt.png", answer: "portugal", difficulty: 1 },
+            { image: "images/drapeaux/us.png", answer: "etats unis", difficulty: 1 },
+            { image: "images/drapeaux/at.png", answer: "autriche", difficulty: 2 },
+            { image: "images/drapeaux/co.png", answer: "colombie", difficulty: 2 },
+            { image: "images/drapeaux/hr.png", answer: "croatie", difficulty: 2 },
+            { image: "images/drapeaux/ie.png", answer: "irlande", difficulty: 2 },
+            { image: "images/drapeaux/in.png", answer: "inde", difficulty: 2 },
+            { image: "images/drapeaux/nl.png", answer: "pays bas", difficulty: 2 },
+            { image: "images/drapeaux/ru.png", answer: "russie", difficulty: 2 },
+            { image: "images/drapeaux/tn.png", answer: "tunisie", difficulty: 2 },
+            { image: "images/drapeaux/tr.png", answer: "turquie", difficulty: 2 },
+            { image: "images/drapeaux/ad.png", answer: "andorre", difficulty: 2 },
+            { image: "images/drapeaux/al.png", answer: "albanie", difficulty: 2 },
+            { image: "images/drapeaux/am.png", answer: "armenie", difficulty: 2 },
+            { image: "images/drapeaux/ao.png", answer: "angola", difficulty: 2 },
+            { image: "images/drapeaux/az.png", answer: "azerbaidjan", difficulty: 2 },
+            { image: "images/drapeaux/ba.png", answer: "bosnie", difficulty: 2 },
+            { image: "images/drapeaux/bb.png", answer: "barbade", difficulty: 2 },
+            { image: "images/drapeaux/bd.png", answer: "bangladesh", difficulty: 2 },
+            { image: "images/drapeaux/bg.png", answer: "bulgarie", difficulty: 2 },
+            { image: "images/drapeaux/bo.png", answer: "bolivie", difficulty: 2 },
+            { image: "images/drapeaux/bw.png", answer: "botswana", difficulty: 2 },
+            { image: "images/drapeaux/by.png", answer: "bielorussie", difficulty: 2 },
+            { image: "images/drapeaux/cd.png", answer: "congo", difficulty: 2 },
+            { image: "images/drapeaux/cg.png", answer: "congo", difficulty: 2 },
+            { image: "images/drapeaux/ci.png", answer: "cote d'ivoire", difficulty: 2 },
+            { image: "images/drapeaux/cl.png", answer: "chili", difficulty: 2 },
+            { image: "images/drapeaux/cm.png", answer: "cameroun", difficulty: 2 },
+            { image: "images/drapeaux/cr.png", answer: "costa rica", difficulty: 2 },
+            { image: "images/drapeaux/cu.png", answer: "cuba", difficulty: 2 },
+            { image: "images/drapeaux/cy.png", answer: "chypre", difficulty: 2 },
+            { image: "images/drapeaux/cz.png", answer: "republique tcheque", difficulty: 2 },
+            { image: "images/drapeaux/dk.png", answer: "danemark", difficulty: 2 },
+            { image: "images/drapeaux/do.png", answer: "republique dominicaine", difficulty: 2 },
+            { image: "images/drapeaux/ec.png", answer: "equateur", difficulty: 2 },
+            { image: "images/drapeaux/ee.png", answer: "estonie", difficulty: 2 },
+            { image: "images/drapeaux/eg.png", answer: "egypte", difficulty: 2 },
+            { image: "images/drapeaux/fi.png", answer: "finlande", difficulty: 2 },
+            { image: "images/drapeaux/ge.png", answer: "georgie", difficulty: 2 },
+            { image: "images/drapeaux/gh.png", answer: "ghana", difficulty: 2 },
+            { image: "images/drapeaux/hu.png", answer: "hongrie", difficulty: 2 },
+            { image: "images/drapeaux/id.png", answer: "indonesie", difficulty: 2 },
+            { image: "images/drapeaux/il.png", answer: "israel", difficulty: 2 },
+            { image: "images/drapeaux/ir.png", answer: "iran", difficulty: 2 },
+            { image: "images/drapeaux/is.png", answer: "islande", difficulty: 2 },
+            { image: "images/drapeaux/jm.png", answer: "jamaique", difficulty: 2 },
+            { image: "images/drapeaux/lb.png", answer: "liban", difficulty: 2 },
+            { image: "images/drapeaux/li.png", answer: "liechtenstein", difficulty: 2 },
+            { image: "images/drapeaux/lt.png", answer: "lituanie", difficulty: 2 },
+            { image: "images/drapeaux/lu.png", answer: "luxembourg", difficulty: 2 },
+            { image: "images/drapeaux/mc.png", answer: "monaco", difficulty: 2 },
+            { image: "images/drapeaux/mt.png", answer: "malte", difficulty: 2 },
+            { image: "images/drapeaux/ng.png", answer: "nigeria", difficulty: 2 },
+            { image: "images/drapeaux/no.png", answer: "norvege", difficulty: 2 },
+            { image: "images/drapeaux/nz.png", answer: "nouvelle zelande", difficulty: 2 },
+            { image: "images/drapeaux/pe.png", answer: "perou", difficulty: 2 },
+            { image: "images/drapeaux/pl.png", answer: "pologne", difficulty: 2 },
+            { image: "images/drapeaux/sc.png", answer: "seychelles", difficulty: 2 },
+            { image: "images/drapeaux/se.png", answer: "suede", difficulty: 2 },
+            { image: "images/drapeaux/si.png", answer: "slovenie", difficulty: 2 },
+            { image: "images/drapeaux/sk.png", answer: "slovaquie", difficulty: 2 },
+            { image: "images/drapeaux/sn.png", answer: "senegal", difficulty: 2 },
+            { image: "images/drapeaux/th.png", answer: "thailande", difficulty: 2 },
+            { image: "images/drapeaux/tw.png", answer: "taiwan", difficulty: 2 },
+            { image: "images/drapeaux/ua.png", answer: "ukraine", difficulty: 2 },
+            { image: "images/drapeaux/vn.png", answer: "vietnam", difficulty: 2 },
+            { image: "images/drapeaux/za.png", answer: "afrique du sud", difficulty: 2 },
+            { image: "images/drapeaux/ae.png", answer: "emirats arabes unis", difficulty: 3 },
+            { image: "images/drapeaux/af.png", answer: "afghanistan", difficulty: 3 },
+            { image: "images/drapeaux/ag.png", answer: "antigua et barbuda", difficulty: 3 },
+            { image: "images/drapeaux/bf.png", answer: "burkina faso", difficulty: 3 },
+            { image: "images/drapeaux/bh.png", answer: "bahrein", difficulty: 3 },
+            { image: "images/drapeaux/bi.png", answer: "burundi", difficulty: 3 },
+            { image: "images/drapeaux/bj.png", answer: "benin", difficulty: 3 },
+            { image: "images/drapeaux/bn.png", answer: "brunei", difficulty: 3 },
+            { image: "images/drapeaux/bs.png", answer: "bahamas", difficulty: 3 },
+            { image: "images/drapeaux/bt.png", answer: "bhoutan", difficulty: 3 },
+            { image: "images/drapeaux/bz.png", answer: "belize", difficulty: 3 },
+            { image: "images/drapeaux/cf.png", answer: "centrafrique", difficulty: 3 },
+            { image: "images/drapeaux/cv.png", answer: "cap vert", difficulty: 3 },
+            { image: "images/drapeaux/dj.png", answer: "djibouti", difficulty: 3 },
+            { image: "images/drapeaux/dm.png", answer: "dominique", difficulty: 3 },
+            { image: "images/drapeaux/er.png", answer: "erythree", difficulty: 3 },
+            { image: "images/drapeaux/et.png", answer: "ethiopie", difficulty: 3 },
+            { image: "images/drapeaux/fj.png", answer: "fidji", difficulty: 3 },
+            { image: "images/drapeaux/fm.png", answer: "micronesie", difficulty: 3 },
+            { image: "images/drapeaux/ga.png", answer: "gabon", difficulty: 3 },
+            { image: "images/drapeaux/gd.png", answer: "grenade", difficulty: 3 },
+            { image: "images/drapeaux/gm.png", answer: "gambie", difficulty: 3 },
+            { image: "images/drapeaux/gn.png", answer: "guinee", difficulty: 3 },
+            { image: "images/drapeaux/gq.png", answer: "guinee equatoriale", difficulty: 3 },
+            { image: "images/drapeaux/gt.png", answer: "guatemala", difficulty: 3 },
+            { image: "images/drapeaux/gw.png", answer: "guinee bissau", difficulty: 3 },
+            { image: "images/drapeaux/gy.png", answer: "guyana", difficulty: 3 },
+            { image: "images/drapeaux/hn.png", answer: "honduras", difficulty: 3 },
+            { image: "images/drapeaux/ht.png", answer: "haiti", difficulty: 3 },
+            { image: "images/drapeaux/iq.png", answer: "irak", difficulty: 3 },
+            { image: "images/drapeaux/jo.png", answer: "jordanie", difficulty: 3 },
+            { image: "images/drapeaux/ke.png", answer: "kenya", difficulty: 3 },
+            { image: "images/drapeaux/kg.png", answer: "kirghizistan", difficulty: 3 },
+            { image: "images/drapeaux/kh.png", answer: "cambodge", difficulty: 3 },
+            { image: "images/drapeaux/km.png", answer: "comores", difficulty: 3 },
+            { image: "images/drapeaux/kn.png", answer: "saint kitts et nevis", difficulty: 3 },
+            { image: "images/drapeaux/kw.png", answer: "koweit", difficulty: 3 },
+            { image: "images/drapeaux/kz.png", answer: "kazakhstan", difficulty: 3 },
+            { image: "images/drapeaux/la.png", answer: "laos", difficulty: 3 },
+            { image: "images/drapeaux/lc.png", answer: "sainte lucie", difficulty: 3 },
+            { image: "images/drapeaux/lk.png", answer: "sri lanka", difficulty: 3 },
+            { image: "images/drapeaux/lr.png", answer: "liberia", difficulty: 3 },
+            { image: "images/drapeaux/ls.png", answer: "lesotho", difficulty: 3 },
+            { image: "images/drapeaux/lv.png", answer: "lettonie", difficulty: 3 },
+            { image: "images/drapeaux/ly.png", answer: "libye", difficulty: 3 },
+            { image: "images/drapeaux/md.png", answer: "moldavie", difficulty: 3 },
+            { image: "images/drapeaux/me.png", answer: "montenegro", difficulty: 3 },
+            { image: "images/drapeaux/mg.png", answer: "madagascar", difficulty: 3 },
+            { image: "images/drapeaux/mh.png", answer: "iles marshall", difficulty: 3 },
+            { image: "images/drapeaux/mk.png", answer: "macedoine", difficulty: 3 },
+            { image: "images/drapeaux/ml.png", answer: "mali", difficulty: 3 },
+            { image: "images/drapeaux/mm.png", answer: "myanmar", difficulty: 3 },
+            { image: "images/drapeaux/mn.png", answer: "mongolie", difficulty: 3 },
+            { image: "images/drapeaux/mr.png", answer: "mauritanie", difficulty: 3 },
+            { image: "images/drapeaux/mu.png", answer: "maurice", difficulty: 3 },
+            { image: "images/drapeaux/mv.png", answer: "maldives", difficulty: 3 },
+            { image: "images/drapeaux/mw.png", answer: "malawi", difficulty: 3 },
+            { image: "images/drapeaux/my.png", answer: "malaisie", difficulty: 3 },
+            { image: "images/drapeaux/mz.png", answer: "mozambique", difficulty: 3 },
+            { image: "images/drapeaux/na.png", answer: "namibie", difficulty: 3 },
+            { image: "images/drapeaux/ne.png", answer: "niger", difficulty: 3 },
+            { image: "images/drapeaux/ni.png", answer: "nicaragua", difficulty: 3 },
+            { image: "images/drapeaux/np.png", answer: "nepal", difficulty: 3 },
+            { image: "images/drapeaux/om.png", answer: "oman", difficulty: 3 },
+            { image: "images/drapeaux/pa.png", answer: "panama", difficulty: 3 },
+            { image: "images/drapeaux/pg.png", answer: "papouasie", difficulty: 3 },
+            { image: "images/drapeaux/ph.png", answer: "philippines", difficulty: 3 },
+            { image: "images/drapeaux/pk.png", answer: "pakistan", difficulty: 3 },
+            { image: "images/drapeaux/pw.png", answer: "palaos", difficulty: 3 },
+            { image: "images/drapeaux/py.png", answer: "paraguay", difficulty: 3 },
+            { image: "images/drapeaux/qa.png", answer: "qatar", difficulty: 3 },
+            { image: "images/drapeaux/ro.png", answer: "roumanie", difficulty: 3 },
+            { image: "images/drapeaux/rs.png", answer: "serbie", difficulty: 3 },
+            { image: "images/drapeaux/rw.png", answer: "rwanda", difficulty: 3 },
+            { image: "images/drapeaux/sa.png", answer: "arabie saoudite", difficulty: 3 },
+            { image: "images/drapeaux/sd.png", answer: "soudan", difficulty: 3 },
+            { image: "images/drapeaux/sg.png", answer: "singapour", difficulty: 3 },
+            { image: "images/drapeaux/sl.png", answer: "sierra leone", difficulty: 3 },
+            { image: "images/drapeaux/sm.png", answer: "saint marin", difficulty: 3 },
+            { image: "images/drapeaux/so.png", answer: "somalie", difficulty: 3 },
+            { image: "images/drapeaux/sr.png", answer: "suriname", difficulty: 3 },
+            { image: "images/drapeaux/ss.png", answer: "soudan du sud", difficulty: 3 },
+            { image: "images/drapeaux/st.png", answer: "sao tome", difficulty: 3 },
+            { image: "images/drapeaux/sv.png", answer: "salvador", difficulty: 3 },
+            { image: "images/drapeaux/sy.png", answer: "syrie", difficulty: 3 },
+            { image: "images/drapeaux/sz.png", answer: "eswatini", difficulty: 3 },
+            { image: "images/drapeaux/td.png", answer: "tchad", difficulty: 3 },
+            { image: "images/drapeaux/tg.png", answer: "togo", difficulty: 3 },
+            { image: "images/drapeaux/tj.png", answer: "tadjikistan", difficulty: 3 },
+            { image: "images/drapeaux/tl.png", answer: "timor oriental", difficulty: 3 },
+            { image: "images/drapeaux/tm.png", answer: "turkmenistan", difficulty: 3 },
+            { image: "images/drapeaux/to.png", answer: "tonga", difficulty: 3 },
+            { image: "images/drapeaux/tt.png", answer: "trinite et tobago", difficulty: 3 },
+            { image: "images/drapeaux/tv.png", answer: "tuvalu", difficulty: 3 },
+            { image: "images/drapeaux/tz.png", answer: "tanzanie", difficulty: 3 },
+            { image: "images/drapeaux/ug.png", answer: "ouganda", difficulty: 3 },
+            { image: "images/drapeaux/uy.png", answer: "uruguay", difficulty: 3 },
+            { image: "images/drapeaux/uz.png", answer: "ouzbekistan", difficulty: 3 },
+            { image: "images/drapeaux/vc.png", answer: "saint vincent", difficulty: 3 },
+            { image: "images/drapeaux/ve.png", answer: "venezuela", difficulty: 3 },
+            { image: "images/drapeaux/vu.png", answer: "vanuatu", difficulty: 3 },
+            { image: "images/drapeaux/ws.png", answer: "samoa", difficulty: 3 },
+            { image: "images/drapeaux/ye.png", answer: "yemen", difficulty: 3 },
+            { image: "images/drapeaux/zm.png", answer: "zambie", difficulty: 3 },
+            { image: "images/drapeaux/zw.png", answer: "zimbabwe", difficulty: 3 }
+        ],
+
+    animaux: [
+        // ───── Difficulté 1 : animaux très populaires ─────
+        { image: "images/animaux/lion.jpg", answer: "lion", difficulty: 1 },
+        { image: "images/animaux/tigre.jpg", answer: "tigre", difficulty: 1 },
+        { image: "images/animaux/elephant.jpg", answer: "elephant", difficulty: 1 },
+        { image: "images/animaux/girafe.jpg", answer: "girafe", difficulty: 1 },
+        { image: "images/animaux/zebre.jpg", answer: "zebre", difficulty: 1 },
+        { image: "images/animaux/leopard.JPG", answer: "leopard", difficulty: 1 },
+        { image: "images/animaux/gorille.jpg", answer: "gorille", difficulty: 1 },
+        { image: "images/animaux/chimpanze.jpg", answer: "chimpanze", difficulty: 1 },
+        { image: "images/animaux/hippopotame.jpg", answer: "hippopotame", difficulty: 1 },
+        { image: "images/animaux/rhinoceros.jpg", answer: "rhinoceros", difficulty: 1 },
+        { image: "images/animaux/crocodile.jpg", answer: "crocodile", difficulty: 1 },
+        { image: "images/animaux/autruche.jpg", answer: "autruche", difficulty: 1 },
+        { image: "images/animaux/aigle.jpg", answer: "aigle", difficulty: 1 },
+        { image: "images/animaux/dauphin.jpg", answer: "dauphin", difficulty: 1 },
+        { image: "images/animaux/baleine.jpg", answer: "baleine", difficulty: 1 },
+        { image: "images/animaux/requin.jpg", answer: "requin", acceptedAnswers: ["requin", "requin blanc", "grand requin blanc"], difficulty: 1 },
+        { image: "images/animaux/tortue.jpg", answer: "tortue", acceptedAnswers: ["tortue", "tortue de mer", "tortue marine"], difficulty: 1 },
+        { image: "images/animaux/panda.jpg", answer: "panda", acceptedAnswers: ["panda", "panda geant", "grand panda"], difficulty: 1 },
+        { image: "images/animaux/koala.jpg", answer: "koala", difficulty: 1 },
+        { image: "images/animaux/kangourou.jpg", answer: "kangourou", difficulty: 1 },
+        { image: "images/animaux/loup.jpg", answer: "loup", difficulty: 1 },
+        { image: "images/animaux/renard.jpg", answer: "renard", difficulty: 1 },
+        { image: "images/animaux/ours_brun.jpg", answer: "ours brun", acceptedAnswers: ["ours brun", "ours"], difficulty: 1 },
+        { image: "images/animaux/ours_polaire.jpg", answer: "ours polaire", acceptedAnswers: ["ours polaire", "ours blanc"], difficulty: 1 },
+        { image: "images/animaux/paon.jpg", answer: "paon", difficulty: 1 },
+        { image: "images/animaux/hibou.jpg", answer: "hibou", acceptedAnswers: ["hibou", "chouette", "grand duc"], difficulty: 1 },
+        { image: "images/animaux/perroquet.jpg", answer: "perroquet", difficulty: 1 },
+        { image: "images/animaux/flamant.jpg", answer: "flamant", acceptedAnswers: ["flamant", "flamant rose"], difficulty: 1 },
+
+        // ───── Difficulté 2 : animaux moyennement connus ─────
+        { image: "images/animaux/guepard.jpg", answer: "guepard", difficulty: 2 },
+        { image: "images/animaux/jaguar.jpg", answer: "jaguar", difficulty: 2 },
+        { image: "images/animaux/puma.jpg", answer: "puma", difficulty: 2 },
+        { image: "images/animaux/lynx.jpg", answer: "lynx", difficulty: 2 },
+        { image: "images/animaux/orang_outan.jpg", answer: "orang outan", acceptedAnswers: ["orang outan", "orang-outan", "orangutan"], difficulty: 2 },
+        { image: "images/animaux/babouin.jpg", answer: "babouin", difficulty: 2 },
+        { image: "images/animaux/macaque.jpg", answer: "macaque", difficulty: 2 },
+        { image: "images/animaux/hyene.jpg", answer: "hyene", difficulty: 2 },
+        { image: "images/animaux/coyote.jpg", answer: "coyote", difficulty: 2 },
+        { image: "images/animaux/buffle.jpg", answer: "buffle", difficulty: 2 },
+        { image: "images/animaux/orque.jpg", answer: "orque", acceptedAnswers: ["orque", "epaulard"], difficulty: 2 },
+        { image: "images/animaux/morse.jpg", answer: "morse", difficulty: 2 },
+        { image: "images/animaux/phoque.jpg", answer: "phoque", difficulty: 2 },
+        { image: "images/animaux/manchot.jpg", answer: "manchot", acceptedAnswers: ["manchot", "manchot empereur", "pingouin"], difficulty: 2 },
+        { image: "images/animaux/pelican.jpg", answer: "pelican", difficulty: 2 },
+        { image: "images/animaux/toucan.jpg", answer: "toucan", difficulty: 2 },
+        { image: "images/animaux/iguane.jpg", answer: "iguane", difficulty: 2 },
+        { image: "images/animaux/anaconda.jpg", answer: "anaconda", difficulty: 2 },
+        { image: "images/animaux/cobra.jpg", answer: "cobra", acceptedAnswers: ["cobra", "naja"], difficulty: 2 },
+        { image: "images/animaux/tigre_blanc.jpg", answer: "tigre blanc", difficulty: 2 },
+        { image: "images/animaux/panda_roux.jpg", answer: "panda roux", difficulty: 2 },
+        { image: "images/animaux/raton_laveur.jpg", answer: "raton laveur", acceptedAnswers: ["raton laveur", "raton"], difficulty: 2 },
+        { image: "images/animaux/fennec.jpg", answer: "fennec", difficulty: 2 },
+        { image: "images/animaux/suricate.jpg", answer: "suricate", difficulty: 2 },
+        { image: "images/animaux/papillon.JPG", answer: "papillon", acceptedAnswers: ["papillon", "morpho"], difficulty: 2 },
+        { image: "images/animaux/otarie.jpg", answer: "otarie", difficulty: 2 },
+        { image: "images/animaux/scorpion.jpg", answer: "scorpion", difficulty: 2 },
+        { image: "images/animaux/abeille.jpg", answer: "abeille", difficulty: 2 },
+        { image: "images/animaux/mante_religieuse.jpg", answer: "mante religieuse", acceptedAnswers: ["mante religieuse", "mante"], difficulty: 2 },
+        { image: "images/animaux/raie.jpg", answer: "raie", acceptedAnswers: ["raie", "raie manta", "manta"], difficulty: 2 },
+
+        // ───── Difficulté 3 : animaux moins connus / exotiques ─────
+        { image: "images/animaux/mandrill.jpg", answer: "mandrill", difficulty: 3 },
+        { image: "images/animaux/bonobo.jpg", answer: "bonobo", difficulty: 3 },
+        { image: "images/animaux/orangutan.jpg", answer: "orangutan", acceptedAnswers: ["orangutan", "orang outan", "orang-outan"], difficulty: 3 },
+        { image: "images/animaux/okapi.jpg", answer: "okapi", difficulty: 3 },
+        { image: "images/animaux/ocelot.jpg", answer: "ocelot", difficulty: 3 },
+        { image: "images/animaux/opossum.jpg", answer: "opossum", difficulty: 3 },
+        { image: "images/animaux/gecko.jpg", answer: "gecko", difficulty: 3 },
+        { image: "images/animaux/phacochere.jpg", answer: "phacochere", difficulty: 3 },
+        { image: "images/animaux/lamantin.jpg", answer: "lamantin", acceptedAnswers: ["lamantin", "lamantins"], difficulty: 3 },
+        { image: "images/animaux/capybara.jpg", answer: "capybara", difficulty: 3 },
+        { image: "images/animaux/castor.jpg", answer: "castor", difficulty: 3 },
+        { image: "images/animaux/diable_tasmanie.jpg", answer: "diable de tasmanie", acceptedAnswers: ["diable de tasmanie", "diable tasmanie", "diable", "tasmanie"], difficulty: 3 },
+        { image: "images/animaux/axolot.jpg", answer: "axolot", acceptedAnswers: ["axolot", "axolotl"], difficulty: 3 },
+        { image: "images/animaux/fourmilier.jpg", answer: "fourmilier", acceptedAnswers: ["fourmilier", "tamanoir"], difficulty: 3 },
+        { image: "images/animaux/binturong.jpg", answer: "binturong", difficulty: 3 },
+        { image: "images/animaux/yak.jpg", answer: "yak", acceptedAnswers: ["yak", "yack"], difficulty: 3 },
+        { image: "images/animaux/komodo.jpg", answer: "komodo", acceptedAnswers: ["komodo", "varan", "varan de komodo"], difficulty: 3 },
+        { image: "images/animaux/cameleon.jpg", answer: "cameleon", difficulty: 3 },
+        { image: "images/animaux/colibri.jpg", answer: "colibri", difficulty: 3 },
+        { image: "images/animaux/albatros.jpg", answer: "albatros", difficulty: 3 },
+        { image: "images/animaux/narval.jpg", answer: "narval", difficulty: 3 },
+        { image: "images/animaux/gnou.jpg", answer: "gnou", difficulty: 3 },
+        { image: "images/animaux/tatou.jpg", answer: "tatou", difficulty: 3 },
+        { image: "images/animaux/tapir.JPG", answer: "tapir", difficulty: 3 }
+    ],
+    chiens: [
+        // ── Difficulté 1 — très populaires ──
+        { image: "images/chiens/labrador.jpg", answer: "labrador", acceptedAnswers: ["labrador", "labrador retriever"], difficulty: 1 },
+        { image: "images/chiens/golden_retriever.jpg", answer: "golden retriever", acceptedAnswers: ["golden retriever", "golden"], difficulty: 1 },
+        { image: "images/chiens/berger_allemand.jpg", answer: "berger allemand", acceptedAnswers: ["berger allemand", "german shepherd"], difficulty: 1 },
+        { image: "images/chiens/bouledogue_francais.jpg", answer: "bouledogue francais", acceptedAnswers: ["bouledogue francais", "french bulldog", "frenchie"], difficulty: 1 },
+        { image: "images/chiens/bouledogue_anglais.jpg", answer: "bouledogue anglais", acceptedAnswers: ["bouledogue anglais", "bulldog", "english bulldog"], difficulty: 1 },
+        { image: "images/chiens/caniche.jpg", answer: "caniche", acceptedAnswers: ["caniche", "poodle"], difficulty: 1 },
+        { image: "images/chiens/beagle.jpg", answer: "beagle", difficulty: 1 },
+        { image: "images/chiens/rottweiler.jpg", answer: "rottweiler", difficulty: 1 },
+        { image: "images/chiens/teckel.jpg", answer: "teckel", acceptedAnswers: ["teckel", "dachshund", "basset allemand"], difficulty: 1 },
+        { image: "images/chiens/yorkshire.jpg", answer: "yorkshire", difficulty: 1 },
+        { image: "images/chiens/boxer.jpg", answer: "boxer", difficulty: 1 },
+        { image: "images/chiens/doberman.jpg", answer: "doberman", difficulty: 1 },
+        { image: "images/chiens/husky.jpg", answer: "husky", acceptedAnswers: ["husky", "husky siberien", "siberian husky"], difficulty: 1 },
+        { image: "images/chiens/dalmatien.jpg", answer: "dalmatien", difficulty: 1 },
+        { image: "images/chiens/chihuahua.jpg", answer: "chihuahua", difficulty: 1 },
+        { image: "images/chiens/border_collie.jpg", answer: "border collie", difficulty: 1 },
+        { image: "images/chiens/shih_tzu.jpg", answer: "shih tzu", difficulty: 1 },
+        { image: "images/chiens/carlin.jpg", answer: "carlin", acceptedAnswers: ["carlin", "pug"], difficulty: 1 },
+        { image: "images/chiens/malinois.jpg", answer: "malinois", difficulty: 1 },
+        { image: "images/chiens/saint_bernard.jpg", answer: "saint bernard", acceptedAnswers: ["saint bernard", "st bernard"], difficulty: 1 },
+        // ── Difficulté 2 — populaires ──
+        { image: "images/chiens/berger_australien.jpg", answer: "berger australien", acceptedAnswers: ["berger australien", "aussie"], difficulty: 2 },
+        { image: "images/chiens/cocker.jpg", answer: "cocker", acceptedAnswers: ["cocker", "cocker spaniel"], difficulty: 2 },
+        { image: "images/chiens/spitz.jpg", answer: "spitz", difficulty: 2 },
+        { image: "images/chiens/samoyede.jpg", answer: "samoyede", difficulty: 2 },
+        { image: "images/chiens/akita.png", answer: "akita", difficulty: 2 },
+        { image: "images/chiens/shiba.jpg", answer: "shiba", difficulty: 2 },
+        { image: "images/chiens/chow_chow.jpg", answer: "chow chow", difficulty: 2 },
+        { image: "images/chiens/epagneul_breton.jpg", answer: "epagneul breton", acceptedAnswers: ["epagneul breton", "breton"], difficulty: 2 },
+        { image: "images/chiens/braque_weimar.jpg", answer: "braque de weimar", acceptedAnswers: ["braque de weimar", "weimaraner"], difficulty: 2 },
+        { image: "images/chiens/berger_blanc.jpg", answer: "berger blanc suisse", acceptedAnswers: ["berger blanc suisse", "berger blanc"], difficulty: 2 },
+        { image: "images/chiens/bull_terrier.jpg", answer: "bull terrier", difficulty: 2 },
+        { image: "images/chiens/amstaff.jpg", answer: "american staffordshire", acceptedAnswers: ["american staffordshire", "amstaff"], difficulty: 2 },
+        { image: "images/chiens/jack_russell.jpg", answer: "jack russell", acceptedAnswers: ["jack russell", "jack russell terrier"], difficulty: 2 },
+        { image: "images/chiens/setter_irlandais.jpg", answer: "setter irlandais", difficulty: 2 },
+        { image: "images/chiens/bichon.jpg", answer: "bichon", difficulty: 2 },
+        { image: "images/chiens/whippet.jpg", answer: "whippet", difficulty: 2 },
+        { image: "images/chiens/greyhound.jpg", answer: "greyhound", difficulty: 2 },
+        { image: "images/chiens/levrier_afghan.jpg", answer: "levrier afghan", acceptedAnswers: ["levrier afghan", "afghan hound", "afghan"], difficulty: 2 },
+        { image: "images/chiens/terre_neuve.jpg", answer: "terre neuve", acceptedAnswers: ["terre neuve", "newfoundland"], difficulty: 2 },
+        { image: "images/chiens/leonberger.jpg", answer: "leonberger", difficulty: 2 },
+        { image: "images/chiens/malamute.jpg", answer: "malamute", difficulty: 2 },
+        { image: "images/chiens/bouvier_bernois.jpg", answer: "bouvier bernois", acceptedAnswers: ["bouvier bernois", "bernois"], difficulty: 2 },
+        { image: "images/chiens/briard.jpg", answer: "briard", difficulty: 2 },
+        { image: "images/chiens/pointer.jpg", answer: "pointer", difficulty: 2 },
+        { image: "images/chiens/labradoodle.jpg", answer: "labradoodle", difficulty: 2 },
+        { image: "images/chiens/saint_hubert.jpg", answer: "saint hubert", acceptedAnswers: ["saint hubert", "bloodhound"], difficulty: 2 },
+        { image: "images/chiens/basset_hound.jpg", answer: "basset hound", acceptedAnswers: ["basset hound", "basset"], difficulty: 2 },
+        { image: "images/chiens/cavalier_king.jpg", answer: "cavalier king charles", acceptedAnswers: ["cavalier king charles", "cavalier"], difficulty: 2 },
+        { image: "images/chiens/lhassa_apso.jpg", answer: "lhassa apso", acceptedAnswers: ["lhassa apso", "lhasa apso"], difficulty: 2 },
+        { image: "images/chiens/fox_terrier.jpg", answer: "fox terrier", difficulty: 2 },
+        { image: "images/chiens/levrier_irlandais.jpg", answer: "levrier irlandais", acceptedAnswers: ["levrier irlandais", "irish wolfhound"], difficulty: 2 },
+        { image: "images/chiens/border_terrier.jpg", answer: "border terrier", difficulty: 2 },
+        { image: "images/chiens/cairn_terrier.jpg", answer: "cairn terrier", difficulty: 2 },
+        { image: "images/chiens/berger_picard.jpg", answer: "berger picard", acceptedAnswers: ["berger picard", "picard"], difficulty: 2 },
+        { image: "images/chiens/bouvier_flandres.jpg", answer: "bouvier des flandres", acceptedAnswers: ["bouvier des flandres", "bouvier"], difficulty: 2 },
+        { image: "images/chiens/braque_allemand.jpg", answer: "braque allemand", acceptedAnswers: ["braque allemand", "german shorthaired pointer"], difficulty: 2 },
+        { image: "images/chiens/epagneul_papillon.jpg", answer: "papillon", difficulty: 2 },
+        { image: "images/chiens/schnauzer.png", answer: "schnauzer", difficulty: 2 },
+        { image: "images/chiens/berger_belge.jpg", answer: "berger belge", acceptedAnswers: ["berger belge", "malinois", "tervueren"], difficulty: 2 },
+        { image: "images/chiens/dogue_allemand.jpg", answer: "dogue allemand", acceptedAnswers: ["dogue allemand", "great dane"], difficulty: 2 },
+        // ── Difficulté 3 — moins connues ──
+        { image: "images/chiens/beauceron.jpg", answer: "beauceron", difficulty: 3 },
+        { image: "images/chiens/dogue_bordeaux.jpg", answer: "dogue de bordeaux", acceptedAnswers: ["dogue de bordeaux", "bordeaux"], difficulty: 3 },
+        { image: "images/chiens/cane_corso.png", answer: "cane corso", difficulty: 3 },
+        { image: "images/chiens/bouledogue_americain.jpg", answer: "bouledogue americain", difficulty: 3 },
+        { image: "images/chiens/pitbull.jpg", answer: "pitbull", difficulty: 3 },
+        { image: "images/chiens/shar_pei.jpg", answer: "shar pei", difficulty: 3 },
+        { image: "images/chiens/chien_loup.jpg", answer: "chien loup", acceptedAnswers: ["chien loup", "chien loup tchecoslovaque"], difficulty: 3 },
+        { image: "images/chiens/barzoi.jpg", answer: "barzoi", difficulty: 3 },
+        { image: "images/chiens/chien_pharaon.jpg", answer: "chien du pharaon", acceptedAnswers: ["chien du pharaon", "pharaoh hound"], difficulty: 3 },
+        { image: "images/chiens/rhodesian.jpg", answer: "rhodesian ridgeback", acceptedAnswers: ["rhodesian ridgeback", "rhodesian"], difficulty: 3 },
+        { image: "images/chiens/vizsla.jpg", answer: "vizsla", difficulty: 3 },
+        { image: "images/chiens/kuvasz.jpg", answer: "kuvasz", difficulty: 3 },
+        { image: "images/chiens/komondor.jpg", answer: "komondor", difficulty: 3 },
+        { image: "images/chiens/eurasier.jpg", answer: "eurasier", difficulty: 3 },
+        { image: "images/chiens/dogue_canaries.jpg", answer: "dogue des canaries", acceptedAnswers: ["dogue des canaries", "presa canario"], difficulty: 3 },
+        { image: "images/chiens/basenji.jpg", answer: "basenji", difficulty: 3 },
+        { image: "images/chiens/tosa.jpg", answer: "tosa", difficulty: 3 },
+        { image: "images/chiens/fila_brasileiro.jpg", answer: "fila brasileiro", difficulty: 3 },
+        { image: "images/chiens/hokkaido.jpg", answer: "hokkaido", difficulty: 3 },
+        { image: "images/chiens/azawakh.jpg", answer: "azawakh", difficulty: 3 },
+        { image: "images/chiens/xoloitzcuintle.jpg", answer: "xoloitzcuintle", difficulty: 3 },
+        { image: "images/chiens/otterhound.jpg", answer: "otterhound", difficulty: 3 },
+        { image: "images/chiens/kooikerhondje.jpg", answer: "kooikerhondje", difficulty: 3 },
+        { image: "images/chiens/thai_ridgeback.jpg", answer: "thai ridgeback", difficulty: 3 },
+        { image: "images/chiens/chinook.jpg", answer: "chinook", difficulty: 3 },
+        { image: "images/chiens/mudi.jpg", answer: "mudi", difficulty: 3 },
+        { image: "images/chiens/stabyhoun.jpg", answer: "stabyhoun", difficulty: 3 },
+        { image: "images/chiens/chien_nu_perou.jpg", answer: "chien nu du perou", acceptedAnswers: ["chien nu du perou", "peruvian hairless"], difficulty: 3 },
+        { image: "images/chiens/aidi.jpg", answer: "aidi", difficulty: 3 },
+        { image: "images/chiens/eurasian.jpg", answer: "eurasian", difficulty: 3 },
+        { image: "images/chiens/lundehund.jpg", answer: "lundehund", difficulty: 3 },
+        { image: "images/chiens/perro_agua.jpg", answer: "chien d eau espagnol", difficulty: 3 },
+    ],
+    chats: [
+        // ── Difficulté 1 — très populaires ──
+        { image: "images/chats/siamois.jpg", answer: "siamois", acceptedAnswers: ["siamois", "siamese"], difficulty: 1 },
+        { image: "images/chats/persan.jpg", answer: "persan", acceptedAnswers: ["persan", "persian"], difficulty: 1 },
+        { image: "images/chats/maine_coon.jpg", answer: "maine coon", acceptedAnswers: ["maine coon", "maine-coon"], difficulty: 1 },
+        { image: "images/chats/bengal.jpg", answer: "bengal", difficulty: 1 },
+        { image: "images/chats/ragdoll.jpg", answer: "ragdoll", difficulty: 1 },
+        { image: "images/chats/british_shorthair.jpg", answer: "british shorthair", acceptedAnswers: ["british shorthair", "british"], difficulty: 1 },
+        { image: "images/chats/abyssin.jpg", answer: "abyssin", difficulty: 1 },
+        { image: "images/chats/scottish_fold.jpg", answer: "scottish fold", acceptedAnswers: ["scottish fold", "scottish"], difficulty: 1 },
+        { image: "images/chats/sphynx.jpg", answer: "sphynx", difficulty: 1 },
+        { image: "images/chats/sacre_birmanie.jpg", answer: "sacre de birmanie", acceptedAnswers: ["sacre de birmanie", "birman", "birmanie"], difficulty: 1 },
+        { image: "images/chats/norvegien.jpg", answer: "norvegien", acceptedAnswers: ["norvegien", "chat des forets norvegiennes"], difficulty: 1 },
+        { image: "images/chats/angora.jpg", answer: "angora", acceptedAnswers: ["angora", "angora turc"], difficulty: 1 },
+        { image: "images/chats/russe_bleu.jpg", answer: "bleu russe", acceptedAnswers: ["bleu russe", "russian blue", "russe bleu"], difficulty: 1 },
+        { image: "images/chats/burmese.jpg", answer: "burmese", difficulty: 1 },
+        { image: "images/chats/chartreux.jpg", answer: "chartreux", difficulty: 1 },
+        { image: "images/chats/somali.jpg", answer: "somali", difficulty: 1 },
+        { image: "images/chats/ragamuffin.jpg", answer: "ragamuffin", difficulty: 1 },
+        { image: "images/chats/savannah.jpg", answer: "savannah", difficulty: 1 },
+        { image: "images/chats/tonkinois.jpg", answer: "tonkinois", difficulty: 1 },
+        { image: "images/chats/turc_van.png", answer: "turc van", difficulty: 1 },
+        // ── Difficulté 2 — populaires ──
+        { image: "images/chats/american_shorthair.jpg", answer: "american shorthair", difficulty: 2 },
+        { image: "images/chats/bombay.jpg", answer: "bombay", difficulty: 2 },
+        { image: "images/chats/devon_rex.jpg", answer: "devon rex", difficulty: 2 },
+        { image: "images/chats/cornish_rex.jpg", answer: "cornish rex", difficulty: 2 },
+        { image: "images/chats/exotic_shorthair.jpg", answer: "exotic shorthair", acceptedAnswers: ["exotic shorthair", "exotic"], difficulty: 2 },
+        { image: "images/chats/oriental_shorthair.jpg", answer: "oriental shorthair", acceptedAnswers: ["oriental shorthair", "oriental"], difficulty: 2 },
+        { image: "images/chats/balinais.png", answer: "balinais", difficulty: 2 },
+        { image: "images/chats/japonais_bobtail.jpg", answer: "bobtail japonais", acceptedAnswers: ["bobtail japonais", "japanese bobtail"], difficulty: 2 },
+        { image: "images/chats/american_bobtail.jpg", answer: "bobtail americain", acceptedAnswers: ["bobtail americain", "american bobtail"], difficulty: 2 },
+        { image: "images/chats/ocichat.jpg", answer: "ocichat", difficulty: 2 },
+        { image: "images/chats/selkirk_rex.jpg", answer: "selkirk rex", difficulty: 2 },
+        { image: "images/chats/siberian.jpg", answer: "siberien", acceptedAnswers: ["siberien", "siberian"], difficulty: 2 },
+        { image: "images/chats/snowshoe.jpg", answer: "snowshoe", difficulty: 2 },
+        { image: "images/chats/sokoke.jpg", answer: "sokoke", difficulty: 2 },
+        { image: "images/chats/turkish_angora.jpg", answer: "angora turc", difficulty: 2 },
+        { image: "images/chats/egyptian_mau.jpg", answer: "mau egyptien", acceptedAnswers: ["mau egyptien", "egyptian mau"], difficulty: 2 },
+        { image: "images/chats/kurilian_bobtail.jpg", answer: "bobtail des kouriles", acceptedAnswers: ["bobtail des kouriles", "kurilian bobtail"], difficulty: 2 },
+        { image: "images/chats/laperm.jpg", answer: "laperm", difficulty: 2 },
+        { image: "images/chats/munchkin.jpg", answer: "munchkin", difficulty: 2 },
+        { image: "images/chats/nebelung.jpg", answer: "nebelung", difficulty: 2 },
+        { image: "images/chats/neva_masquerade.jpg", answer: "neva masquerade", difficulty: 2 },
+        { image: "images/chats/ocicat.jpg", answer: "ocicat", difficulty: 2 },
+        { image: "images/chats/peterbald.jpg", answer: "peterbald", difficulty: 2 },
+        { image: "images/chats/pixiebob.jpg", answer: "pixiebob", difficulty: 2 },
+        { image: "images/chats/american_curl.jpg", answer: "american curl", difficulty: 2 },
+        { image: "images/chats/burmilla.jpg", answer: "burmilla", difficulty: 2 },
+        { image: "images/chats/chausie.jpg", answer: "chausie", difficulty: 2 },
+        { image: "images/chats/cymric.jpg", answer: "cymric", difficulty: 2 },
+        { image: "images/chats/european_shorthair.jpg", answer: "europeen", difficulty: 2 },
+        { image: "images/chats/german_rex.jpg", answer: "rex allemand", acceptedAnswers: ["rex allemand", "german rex"], difficulty: 2 },
+        { image: "images/chats/highlander.jpg", answer: "highlander", difficulty: 2 },
+        { image: "images/chats/khao_manee.jpg", answer: "khao manee", difficulty: 2 },
+        { image: "images/chats/korat.jpg", answer: "korat", difficulty: 2 },
+        { image: "images/chats/lykoi.jpg", answer: "lykoi", difficulty: 2 },
+        { image: "images/chats/ojos_azules.jpg", answer: "ojos azules", difficulty: 2 },
+        { image: "images/chats/oriental_longhair.jpg", answer: "oriental longhair", difficulty: 2 },
+        // ── Difficulté 3 — moins connues ──
+        { image: "images/chats/australian_mist.jpg", answer: "australian mist", difficulty: 3 },
+        { image: "images/chats/birman.jpg", answer: "birman", difficulty: 3 },
+        { image: "images/chats/california_spangled.jpg", answer: "california spangled", difficulty: 3 },
+        { image: "images/chats/chantilly_tiffany.jpg", answer: "chantilly tiffany", acceptedAnswers: ["chantilly tiffany", "chantilly"], difficulty: 3 },
+        { image: "images/chats/colorpoint_shorthair.jpg", answer: "colorpoint shorthair", difficulty: 3 },
+        { image: "images/chats/cyprus.jpg", answer: "chat de chypre", acceptedAnswers: ["chat de chypre", "aphrodite", "cyprus"], difficulty: 3 },
+        { image: "images/chats/himalayan.jpg", answer: "himalayen", acceptedAnswers: ["himalayen", "himalayan"], difficulty: 3 },
+        { image: "images/chats/javanese.jpg", answer: "javanais", acceptedAnswers: ["javanais", "javanese"], difficulty: 3 },
+        { image: "images/chats/raas.jpg", answer: "raas", difficulty: 3 },
+        { image: "images/chats/serengeti.jpg", answer: "serengeti", difficulty: 3 },
+        { image: "images/chats/thai.jpg", answer: "chat thai", acceptedAnswers: ["chat thai", "thai"], difficulty: 3 },
+        { image: "images/chats/tiffanie.jpg", answer: "tiffanie", difficulty: 3 },
+        { image: "images/chats/toyger.jpg", answer: "toyger", difficulty: 3 },
+        { image: "images/chats/ukrainian_levkoy.jpg", answer: "levkoy ukrainien", acceptedAnswers: ["levkoy ukrainien", "ukrainian levkoy"], difficulty: 3 },
+        { image: "images/chats/van_kedisi.jpg", answer: "van kedisi", difficulty: 3 },
+        { image: "images/chats/maine_coon_polydactyl.jpg", answer: "maine coon polydactyle", difficulty: 3 },
+        { image: "images/chats/minskin.jpg", answer: "minskin", difficulty: 3 },
+    ],
+};
+
+
+// =====================================================================
+// THÈMES "DÉPARTEMENTS" (Noms & Numéros) — pas d'image, on affiche du texte
+// =====================================================================
+// Chaque département est décrit une seule fois (numéro officiel, nom officiel,
+// difficulté). On en dérive automatiquement les deux thèmes :
+//   - departementsnoms    : on affiche le NOM, on attend le NUMÉRO
+//   - departementsnumeros : on affiche le NUMÉRO, on attend le NOM
+//
+// Difficulté :
+//   1 = très connu (gros départements, DOM bien identifiés, capitales régionales)
+//   2 = moyennement connu
+//   3 = peu connu (départements ruraux, similitudes "Haute-…", "…-et-…")
+const _DEPARTEMENTS = [
+    { num: "01", name: "Ain", diff: 3 },
+    { num: "02", name: "Aisne", diff: 3 },
+    { num: "03", name: "Allier", diff: 3 },
+    { num: "04", name: "Alpes-de-Haute-Provence", diff: 3 },
+    { num: "05", name: "Hautes-Alpes", diff: 3 },
+    { num: "06", name: "Alpes-Maritimes", diff: 1 },
+    { num: "07", name: "Ardèche", diff: 2 },
+    { num: "08", name: "Ardennes", diff: 3 },
+    { num: "09", name: "Ariège", diff: 3 },
+    { num: "10", name: "Aube", diff: 3 },
+    { num: "11", name: "Aude", diff: 2 },
+    { num: "12", name: "Aveyron", diff: 3 },
+    { num: "13", name: "Bouches-du-Rhône", diff: 1 },
+    { num: "14", name: "Calvados", diff: 2 },
+    { num: "15", name: "Cantal", diff: 3 },
+    { num: "16", name: "Charente", diff: 3 },
+    { num: "17", name: "Charente-Maritime", diff: 2 },
+    { num: "18", name: "Cher", diff: 3 },
+    { num: "19", name: "Corrèze", diff: 3 },
+    { num: "2A", name: "Corse-du-Sud", diff: 2 },
+    { num: "2B", name: "Haute-Corse", diff: 2 },
+    { num: "21", name: "Côte-d'Or", diff: 2 },
+    { num: "22", name: "Côtes-d'Armor", diff: 2 },
+    { num: "23", name: "Creuse", diff: 3 },
+    { num: "24", name: "Dordogne", diff: 2 },
+    { num: "25", name: "Doubs", diff: 2 },
+    { num: "26", name: "Drôme", diff: 2 },
+    { num: "27", name: "Eure", diff: 2 },
+    { num: "28", name: "Eure-et-Loir", diff: 2 },
+    { num: "29", name: "Finistère", diff: 2 },
+    { num: "30", name: "Gard", diff: 2 },
+    { num: "31", name: "Haute-Garonne", diff: 1 },
+    { num: "32", name: "Gers", diff: 3 },
+    { num: "33", name: "Gironde", diff: 1 },
+    { num: "34", name: "Hérault", diff: 1 },
+    { num: "35", name: "Ille-et-Vilaine", diff: 1 },
+    { num: "36", name: "Indre", diff: 3 },
+    { num: "37", name: "Indre-et-Loire", diff: 2 },
+    { num: "38", name: "Isère", diff: 1 },
+    { num: "39", name: "Jura", diff: 3 },
+    { num: "40", name: "Landes", diff: 2 },
+    { num: "41", name: "Loir-et-Cher", diff: 2 },
+    { num: "42", name: "Loire", diff: 2 },
+    { num: "43", name: "Haute-Loire", diff: 3 },
+    { num: "44", name: "Loire-Atlantique", diff: 1 },
+    { num: "45", name: "Loiret", diff: 2 },
+    { num: "46", name: "Lot", diff: 3 },
+    { num: "47", name: "Lot-et-Garonne", diff: 3 },
+    { num: "48", name: "Lozère", diff: 3 },
+    { num: "49", name: "Maine-et-Loire", diff: 2 },
+    { num: "50", name: "Manche", diff: 3 },
+    { num: "51", name: "Marne", diff: 2 },
+    { num: "52", name: "Haute-Marne", diff: 3 },
+    { num: "53", name: "Mayenne", diff: 3 },
+    { num: "54", name: "Meurthe-et-Moselle", diff: 2 },
+    { num: "55", name: "Meuse", diff: 3 },
+    { num: "56", name: "Morbihan", diff: 2 },
+    { num: "57", name: "Moselle", diff: 2 },
+    { num: "58", name: "Nièvre", diff: 3 },
+    { num: "59", name: "Nord", diff: 1 },
+    { num: "60", name: "Oise", diff: 2 },
+    { num: "61", name: "Orne", diff: 3 },
+    { num: "62", name: "Pas-de-Calais", diff: 1 },
+    { num: "63", name: "Puy-de-Dôme", diff: 2 },
+    { num: "64", name: "Pyrénées-Atlantiques", diff: 2 },
+    { num: "65", name: "Hautes-Pyrénées", diff: 2 },
+    { num: "66", name: "Pyrénées-Orientales", diff: 2 },
+    { num: "67", name: "Bas-Rhin", diff: 1 },
+    { num: "68", name: "Haut-Rhin", diff: 2 },
+    { num: "69", name: "Rhône", diff: 1 },
+    { num: "70", name: "Haute-Saône", diff: 3 },
+    { num: "71", name: "Saône-et-Loire", diff: 2 },
+    { num: "72", name: "Sarthe", diff: 2 },
+    { num: "73", name: "Savoie", diff: 1 },
+    { num: "74", name: "Haute-Savoie", diff: 1 },
+    { num: "75", name: "Paris", diff: 1 },
+    { num: "76", name: "Seine-Maritime", diff: 1 },
+    { num: "77", name: "Seine-et-Marne", diff: 2 },
+    { num: "78", name: "Yvelines", diff: 2 },
+    { num: "79", name: "Deux-Sèvres", diff: 3 },
+    { num: "80", name: "Somme", diff: 2 },
+    { num: "81", name: "Tarn", diff: 2 },
+    { num: "82", name: "Tarn-et-Garonne", diff: 3 },
+    { num: "83", name: "Var", diff: 1 },
+    { num: "84", name: "Vaucluse", diff: 2 },
+    { num: "85", name: "Vendée", diff: 1 },
+    { num: "86", name: "Vienne", diff: 2 },
+    { num: "87", name: "Haute-Vienne", diff: 3 },
+    { num: "88", name: "Vosges", diff: 3 },
+    { num: "89", name: "Yonne", diff: 3 },
+    { num: "90", name: "Territoire de Belfort", diff: 3 },
+    { num: "91", name: "Essonne", diff: 2 },
+    { num: "92", name: "Hauts-de-Seine", diff: 1 },
+    { num: "93", name: "Seine-Saint-Denis", diff: 1 },
+    { num: "94", name: "Val-de-Marne", diff: 1 },
+    { num: "95", name: "Val-d'Oise", diff: 2 },
+    { num: "971", name: "Guadeloupe", diff: 1 },
+    { num: "972", name: "Martinique", diff: 1 },
+    { num: "973", name: "Guyane", diff: 2 },
+    { num: "974", name: "La Réunion", diff: 1 },
+    { num: "976", name: "Mayotte", diff: 3 },
+];
+
+// Accepte aussi bien "01" que "1" pour les départements à 1 chiffre.
+function _acceptedNumeros(num) {
+    const set = new Set([num.toLowerCase()]);
+    if (/^0[1-9]$/.test(num)) set.add(num[1]); // "01" → "1"
+    return [...set];
+}
+
+// Génère plusieurs formes acceptées pour un nom de lieu (département, ville,
+// pays, capitale…) :
+//   - forme canonique (sans accent, minuscule)
+//   - tirets remplacés par espaces
+//   - apostrophes remplacées par espaces
+//   - tirets ET apostrophes remplacés par espaces
+//   - variante avec abréviation Saint→St, Sainte→Ste (et toutes les combi-
+//     naisons hyphens/apostrophes ci-dessus appliquées à cette variante)
+//   - tout `extras` supplémentaire fourni explicitement par l'appelant (ex.
+//     "Évry" comme alias de "Évry-Courcouronnes", "Bujumbura" comme ancien
+//     nom de Gitega, "Le Cap" comme capitale alternative de l'Afrique du Sud)
+// Toutes les variantes sont normalisées (accents retirés) pour matcher la
+// fonction `normalize()` côté serveur.
+function _acceptedNoms(name, extras = []) {
+    const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const set = new Set();
+
+    // Pour une chaîne donnée, on ajoute toutes ses déclinaisons hyphens/apos.
+    const addAllForms = (s) => {
+        set.add(s);
+        set.add(s.replace(/-/g, ' ').replace(/\s+/g, ' ').trim());
+        set.add(s.replace(/'/g, ' ').replace(/\s+/g, ' ').trim());
+        set.add(s.replace(/[-']/g, ' ').replace(/\s+/g, ' ').trim());
+    };
+
+    const base = norm(name);
+    addAllForms(base);
+
+    // Variante avec abréviation Saint→St / Sainte→Ste (utile pour Saint-Étienne,
+    // Saint-Brieuc, Saint-Lô, Sainte-Lucie, etc.).
+    const withStAbbr = base
+        .replace(/\bsainte-/g, 'ste-')
+        .replace(/\bsainte /g, 'ste ')
+        .replace(/\bsaint-/g, 'st-')
+        .replace(/\bsaint /g, 'st ');
+    if (withStAbbr !== base) addAllForms(withStAbbr);
+
+    // Extras manuels fournis par l'appelant.
+    for (const e of extras) addAllForms(norm(e));
+
+    return [...set];
+}
+
+const _COUNTRIES = [
+    { name: "Algérie", capital: "Alger", diff: 1, extraCountry: [], extraCapital: ["Algiers"] },
+    { name: "Allemagne", capital: "Berlin", diff: 1, extraCountry: [], extraCapital: [] },
+    { name: "Argentine", capital: "Buenos Aires", diff: 1, extraCountry: [], extraCapital: [] },
+    { name: "Australie", capital: "Canberra", diff: 1, extraCountry: [], extraCapital: [] },
+    { name: "Belgique", capital: "Bruxelles", diff: 1, extraCountry: [], extraCapital: ["Brussel"] },
+    { name: "Brésil", capital: "Brasilia", diff: 1, extraCountry: [], extraCapital: ["Brasília"] },
+    { name: "Canada", capital: "Ottawa", diff: 1, extraCountry: [], extraCapital: [] },
+    { name: "Chine", capital: "Pékin", diff: 1, extraCountry: [], extraCapital: ["Beijing"] },
+    { name: "Corée du Nord", capital: "Pyongyang", diff: 1, extraCountry: [], extraCapital: ["Pyong Yang"] },
+    { name: "Corée du Sud", capital: "Séoul", diff: 1, extraCountry: [], extraCapital: ["Seoul"] },
+    { name: "Espagne", capital: "Madrid", diff: 1, extraCountry: [], extraCapital: [] },
+    { name: "France", capital: "Paris", diff: 1, extraCountry: [], extraCapital: [] },
+    { name: "Grèce", capital: "Athènes", diff: 1, extraCountry: [], extraCapital: ["Athens"] },
+    { name: "Italie", capital: "Rome", diff: 1, extraCountry: [], extraCapital: ["Roma"] },
+    { name: "Japon", capital: "Tokyo", diff: 1, extraCountry: [], extraCapital: ["Tokio"] },
+    { name: "Maroc", capital: "Rabat", diff: 1, extraCountry: [], extraCapital: [] },
+    { name: "Mexique", capital: "Mexico", diff: 1, extraCountry: [], extraCapital: ["Ciudad de Mexico", "Mexico City"] },
+    { name: "Portugal", capital: "Lisbonne", diff: 1, extraCountry: [], extraCapital: ["Lisbon", "Lisboa"] },
+    { name: "Royaume-Uni", capital: "Londres", diff: 1, extraCountry: ["UK", "Grande-Bretagne", "Angleterre"], extraCapital: ["London"] },
+    { name: "Suisse", capital: "Berne", diff: 1, extraCountry: [], extraCapital: ["Bern"] },
+    { name: "États-Unis", capital: "Washington", diff: 1, extraCountry: ["USA", "United States", "Etats Unis", "Amerique"], extraCapital: ["Washington DC", "Washington D.C."] },
+    { name: "Afrique du Sud", capital: "Pretoria", diff: 2, extraCountry: [], extraCapital: ["Le Cap", "Cape Town", "Bloemfontein"] },
+    { name: "Albanie", capital: "Tirana", diff: 2, extraCountry: [], extraCapital: ["Tirane"] },
+    { name: "Andorre", capital: "Andorre-la-Vieille", diff: 2, extraCountry: [], extraCapital: ["Andorra la Vella"] },
+    { name: "Angola", capital: "Luanda", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Arménie", capital: "Erevan", diff: 2, extraCountry: [], extraCapital: ["Yerevan"] },
+    { name: "Autriche", capital: "Vienne", diff: 2, extraCountry: [], extraCapital: ["Wien", "Vienna"] },
+    { name: "Azerbaïdjan", capital: "Bakou", diff: 2, extraCountry: [], extraCapital: ["Baku"] },
+    { name: "Bangladesh", capital: "Dacca", diff: 2, extraCountry: [], extraCapital: ["Dhaka"] },
+    { name: "Barbade", capital: "Bridgetown", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Biélorussie", capital: "Minsk", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Bolivie", capital: "La Paz", diff: 2, extraCountry: [], extraCapital: ["Sucre"] },
+    { name: "Bosnie", capital: "Sarajevo", diff: 2, extraCountry: ["Bosnie-Herzégovine"], extraCapital: [] },
+    { name: "Botswana", capital: "Gaborone", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Bulgarie", capital: "Sofia", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Cameroun", capital: "Yaoundé", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Chili", capital: "Santiago", diff: 2, extraCountry: [], extraCapital: ["Santiago du Chili"] },
+    { name: "Chypre", capital: "Nicosie", diff: 2, extraCountry: [], extraCapital: ["Nicosia"] },
+    { name: "Colombie", capital: "Bogota", diff: 2, extraCountry: [], extraCapital: ["Bogotá", "Santa Fe de Bogota"] },
+    { name: "Costa Rica", capital: "San José", diff: 2, extraCountry: [], extraCapital: ["San Jose"] },
+    { name: "Croatie", capital: "Zagreb", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Cuba", capital: "La Havane", diff: 2, extraCountry: [], extraCapital: ["Havane", "Havana"] },
+    { name: "Côte d'Ivoire", capital: "Yamoussoukro", diff: 2, extraCountry: [], extraCapital: ["Abidjan"] },
+    { name: "Danemark", capital: "Copenhague", diff: 2, extraCountry: [], extraCapital: ["Copenhagen", "København"] },
+    { name: "Estonie", capital: "Tallinn", diff: 2, extraCountry: [], extraCapital: ["Talinn"] },
+    { name: "Finlande", capital: "Helsinki", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Ghana", capital: "Accra", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Géorgie", capital: "Tbilissi", diff: 2, extraCountry: [], extraCapital: ["Tbilisi"] },
+    { name: "Hongrie", capital: "Budapest", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Inde", capital: "New Delhi", diff: 2, extraCountry: [], extraCapital: ["Delhi", "Nouvelle Delhi"] },
+    { name: "Indonésie", capital: "Jakarta", diff: 2, extraCountry: [], extraCapital: ["Djakarta"] },
+    { name: "Iran", capital: "Téhéran", diff: 2, extraCountry: [], extraCapital: ["Teheran", "Tehran"] },
+    { name: "Irlande", capital: "Dublin", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Islande", capital: "Reykjavik", diff: 2, extraCountry: [], extraCapital: ["Reykjavík"] },
+    { name: "Israël", capital: "Jérusalem", diff: 2, extraCountry: [], extraCapital: ["Jerusalem", "Tel Aviv"] },
+    { name: "Jamaïque", capital: "Kingston", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Liban", capital: "Beyrouth", diff: 2, extraCountry: [], extraCapital: ["Beirut"] },
+    { name: "Liechtenstein", capital: "Vaduz", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Lituanie", capital: "Vilnius", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Luxembourg", capital: "Luxembourg", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Malte", capital: "La Valette", diff: 2, extraCountry: [], extraCapital: ["Valette", "Valletta"] },
+    { name: "Monaco", capital: "Monaco", diff: 2, extraCountry: [], extraCapital: ["Monaco-Ville"] },
+    { name: "Nigeria", capital: "Abuja", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Norvège", capital: "Oslo", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Nouvelle-Zélande", capital: "Wellington", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Pays-Bas", capital: "Amsterdam", diff: 2, extraCountry: ["Hollande"], extraCapital: [] },
+    { name: "Pologne", capital: "Varsovie", diff: 2, extraCountry: [], extraCapital: ["Warsaw", "Warszawa"] },
+    { name: "Pérou", capital: "Lima", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Russie", capital: "Moscou", diff: 2, extraCountry: [], extraCapital: ["Moscow", "Moskva"] },
+    { name: "République dominicaine", capital: "Saint-Domingue", diff: 2, extraCountry: [], extraCapital: ["Santo Domingo"] },
+    { name: "République du Congo", capital: "Brazzaville", diff: 2, extraCountry: ["Congo", "Congo Brazzaville"], extraCapital: [] },
+    { name: "République démocratique du Congo", capital: "Kinshasa", diff: 2, extraCountry: ["Congo", "RDC", "Congo Kinshasa"], extraCapital: [] },
+    { name: "République tchèque", capital: "Prague", diff: 2, extraCountry: ["Tchéquie"], extraCapital: [] },
+    { name: "Seychelles", capital: "Victoria", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Slovaquie", capital: "Bratislava", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Slovénie", capital: "Ljubljana", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Suède", capital: "Stockholm", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Sénégal", capital: "Dakar", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Taïwan", capital: "Taipei", diff: 2, extraCountry: [], extraCapital: ["Taïpei", "Taipeh"] },
+    { name: "Thaïlande", capital: "Bangkok", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Tunisie", capital: "Tunis", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Turquie", capital: "Ankara", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Ukraine", capital: "Kiev", diff: 2, extraCountry: [], extraCapital: ["Kyiv"] },
+    { name: "Vietnam", capital: "Hanoï", diff: 2, extraCountry: ["Viêt Nam"], extraCapital: ["Hanoi"] },
+    { name: "Égypte", capital: "Le Caire", diff: 2, extraCountry: [], extraCapital: ["Caire", "Cairo"] },
+    { name: "Équateur", capital: "Quito", diff: 2, extraCountry: [], extraCapital: [] },
+    { name: "Afghanistan", capital: "Kaboul", diff: 3, extraCountry: [], extraCapital: ["Kabul"] },
+    { name: "Antigua-et-Barbuda", capital: "Saint John's", diff: 3, extraCountry: [], extraCapital: ["Saint John", "St John's", "Saint Jean"] },
+    { name: "Arabie saoudite", capital: "Riyad", diff: 3, extraCountry: [], extraCapital: ["Riyadh"] },
+    { name: "Bahamas", capital: "Nassau", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Bahreïn", capital: "Manama", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Belize", capital: "Belmopan", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Bhoutan", capital: "Thimphou", diff: 3, extraCountry: [], extraCapital: ["Thimphu"] },
+    { name: "Brunei", capital: "Bandar Seri Begawan", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Burkina Faso", capital: "Ouagadougou", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Burundi", capital: "Gitega", diff: 3, extraCountry: [], extraCapital: ["Bujumbura"] },
+    { name: "Bénin", capital: "Porto-Novo", diff: 3, extraCountry: [], extraCapital: ["Cotonou"] },
+    { name: "Cambodge", capital: "Phnom Penh", diff: 3, extraCountry: [], extraCapital: ["Phnom-Penh"] },
+    { name: "Cap-Vert", capital: "Praia", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Centrafrique", capital: "Bangui", diff: 3, extraCountry: ["République centrafricaine"], extraCapital: [] },
+    { name: "Comores", capital: "Moroni", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Djibouti", capital: "Djibouti", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Dominique", capital: "Roseau", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Eswatini", capital: "Mbabane", diff: 3, extraCountry: ["Swaziland"], extraCapital: ["Lobamba"] },
+    { name: "Fidji", capital: "Suva", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Gabon", capital: "Libreville", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Gambie", capital: "Banjul", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Grenade", capital: "Saint-Georges", diff: 3, extraCountry: [], extraCapital: ["Saint Georges", "St Georges"] },
+    { name: "Guatemala", capital: "Guatemala", diff: 3, extraCountry: [], extraCapital: ["Guatemala Ciudad", "Guatemala City"] },
+    { name: "Guinée", capital: "Conakry", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Guinée équatoriale", capital: "Malabo", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Guinée-Bissau", capital: "Bissau", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Guyana", capital: "Georgetown", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Haïti", capital: "Port-au-Prince", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Honduras", capital: "Tegucigalpa", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Irak", capital: "Bagdad", diff: 3, extraCountry: ["Iraq"], extraCapital: ["Baghdad"] },
+    { name: "Jordanie", capital: "Amman", diff: 3, extraCountry: [], extraCapital: ["Ammân"] },
+    { name: "Kazakhstan", capital: "Astana", diff: 3, extraCountry: [], extraCapital: ["Nur-Sultan", "Noursoultan"] },
+    { name: "Kenya", capital: "Nairobi", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Kirghizistan", capital: "Bichkek", diff: 3, extraCountry: [], extraCapital: ["Bishkek"] },
+    { name: "Koweït", capital: "Koweït", diff: 3, extraCountry: [], extraCapital: ["Kuwait", "Koweït City"] },
+    { name: "Laos", capital: "Vientiane", diff: 3, extraCountry: [], extraCapital: ["Viangchan"] },
+    { name: "Lesotho", capital: "Maseru", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Lettonie", capital: "Riga", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Liberia", capital: "Monrovia", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Libye", capital: "Tripoli", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Macédoine", capital: "Skopje", diff: 3, extraCountry: ["Macédoine du Nord"], extraCapital: [] },
+    { name: "Madagascar", capital: "Antananarivo", diff: 3, extraCountry: [], extraCapital: ["Tananarive"] },
+    { name: "Malaisie", capital: "Kuala Lumpur", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Malawi", capital: "Lilongwe", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Maldives", capital: "Malé", diff: 3, extraCountry: [], extraCapital: ["Male"] },
+    { name: "Mali", capital: "Bamako", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Maurice", capital: "Port-Louis", diff: 3, extraCountry: ["Île Maurice"], extraCapital: ["Port Louis"] },
+    { name: "Mauritanie", capital: "Nouakchott", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Micronésie", capital: "Palikir", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Moldavie", capital: "Chisinau", diff: 3, extraCountry: [], extraCapital: ["Chişinău", "Kishinev"] },
+    { name: "Mongolie", capital: "Oulan-Bator", diff: 3, extraCountry: [], extraCapital: ["Oulan Bator", "Ulaanbaatar", "Ulan Bator"] },
+    { name: "Monténégro", capital: "Podgorica", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Mozambique", capital: "Maputo", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Myanmar", capital: "Naypyidaw", diff: 3, extraCountry: ["Birmanie"], extraCapital: ["Nay Pyi Taw", "Naypyitaw", "Yangon", "Rangoun"] },
+    { name: "Namibie", capital: "Windhoek", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Nicaragua", capital: "Managua", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Niger", capital: "Niamey", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Népal", capital: "Katmandou", diff: 3, extraCountry: [], extraCapital: ["Kathmandou", "Kathmandu"] },
+    { name: "Oman", capital: "Mascate", diff: 3, extraCountry: [], extraCapital: ["Muscat"] },
+    { name: "Ouganda", capital: "Kampala", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Ouzbékistan", capital: "Tachkent", diff: 3, extraCountry: [], extraCapital: ["Tashkent"] },
+    { name: "Pakistan", capital: "Islamabad", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Palaos", capital: "Ngerulmud", diff: 3, extraCountry: [], extraCapital: ["Melekeok"] },
+    { name: "Panama", capital: "Panama", diff: 3, extraCountry: [], extraCapital: ["Panama City", "Ciudad de Panama"] },
+    { name: "Papouasie-Nouvelle-Guinée", capital: "Port Moresby", diff: 3, extraCountry: ["Papouasie"], extraCapital: ["Port-Moresby"] },
+    { name: "Paraguay", capital: "Asuncion", diff: 3, extraCountry: [], extraCapital: ["Asunción", "Assomption"] },
+    { name: "Philippines", capital: "Manille", diff: 3, extraCountry: [], extraCapital: ["Manila"] },
+    { name: "Qatar", capital: "Doha", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Roumanie", capital: "Bucarest", diff: 3, extraCountry: [], extraCapital: ["Bucharest", "Bucureşti"] },
+    { name: "Rwanda", capital: "Kigali", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Saint-Kitts-et-Nevis", capital: "Basseterre", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Saint-Marin", capital: "Saint-Marin", diff: 3, extraCountry: [], extraCapital: ["San Marino"] },
+    { name: "Saint-Vincent-et-les-Grenadines", capital: "Kingstown", diff: 3, extraCountry: ["Saint Vincent", "Saint-Vincent"], extraCapital: [] },
+    { name: "Sainte-Lucie", capital: "Castries", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Salvador", capital: "San Salvador", diff: 3, extraCountry: ["El Salvador"], extraCapital: [] },
+    { name: "Samoa", capital: "Apia", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Sao Tomé-et-Principe", capital: "São Tomé", diff: 3, extraCountry: ["Sao Tome"], extraCapital: ["Sao Tome"] },
+    { name: "Serbie", capital: "Belgrade", diff: 3, extraCountry: [], extraCapital: ["Beograd"] },
+    { name: "Sierra Leone", capital: "Freetown", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Singapour", capital: "Singapour", diff: 3, extraCountry: [], extraCapital: ["Singapore"] },
+    { name: "Somalie", capital: "Mogadiscio", diff: 3, extraCountry: [], extraCapital: ["Mogadishu"] },
+    { name: "Soudan", capital: "Khartoum", diff: 3, extraCountry: [], extraCapital: ["Khartoum Nord"] },
+    { name: "Soudan du Sud", capital: "Djouba", diff: 3, extraCountry: [], extraCapital: ["Juba"] },
+    { name: "Sri Lanka", capital: "Sri Jayawardenapura Kotte", diff: 3, extraCountry: [], extraCapital: ["Colombo", "Kotte"] },
+    { name: "Suriname", capital: "Paramaribo", diff: 3, extraCountry: ["Surinam"], extraCapital: [] },
+    { name: "Syrie", capital: "Damas", diff: 3, extraCountry: [], extraCapital: ["Damascus", "Damascene"] },
+    { name: "Tadjikistan", capital: "Douchanbé", diff: 3, extraCountry: [], extraCapital: ["Dushanbe"] },
+    { name: "Tanzanie", capital: "Dodoma", diff: 3, extraCountry: [], extraCapital: ["Dar es Salaam", "Dar Es Salam"] },
+    { name: "Tchad", capital: "N'Djamena", diff: 3, extraCountry: [], extraCapital: ["N Djamena", "Ndjamena"] },
+    { name: "Timor oriental", capital: "Dili", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Togo", capital: "Lomé", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Tonga", capital: "Nuku'alofa", diff: 3, extraCountry: [], extraCapital: ["Nukualofa"] },
+    { name: "Trinité-et-Tobago", capital: "Port-d'Espagne", diff: 3, extraCountry: [], extraCapital: ["Port d'Espagne", "Port of Spain"] },
+    { name: "Turkménistan", capital: "Achgabat", diff: 3, extraCountry: [], extraCapital: ["Achkhabad", "Ashgabat"] },
+    { name: "Tuvalu", capital: "Funafuti", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Uruguay", capital: "Montevideo", diff: 3, extraCountry: [], extraCapital: ["Montévidéo"] },
+    { name: "Vanuatu", capital: "Port-Vila", diff: 3, extraCountry: [], extraCapital: ["Port Vila"] },
+    { name: "Venezuela", capital: "Caracas", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Yémen", capital: "Sanaa", diff: 3, extraCountry: [], extraCapital: ["Sana'a", "Sana"] },
+    { name: "Zambie", capital: "Lusaka", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Zimbabwe", capital: "Harare", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Émirats arabes unis", capital: "Abou Dabi", diff: 3, extraCountry: ["Emirats"], extraCapital: ["Abu Dhabi"] },
+    { name: "Érythrée", capital: "Asmara", diff: 3, extraCountry: [], extraCapital: [] },
+    { name: "Éthiopie", capital: "Addis-Abeba", diff: 3, extraCountry: [], extraCapital: ["Addis Abeba", "Addis Ababa"] },
+    { name: "Îles Marshall", capital: "Majuro", diff: 3, extraCountry: ["Marshall"], extraCapital: [] },
+];
+
+const _CHEFS_LIEUX_MAP = {
+    "01": { chef: "Bourg-en-Bresse", extras: ["Bourg en Bresse", "Bourg"] },
+    "02": { chef: "Laon", extras: [] },
+    "03": { chef: "Moulins", extras: [] },
+    "04": { chef: "Digne-les-Bains", extras: ["Digne", "Digne les Bains"] },
+    "05": { chef: "Gap", extras: [] },
+    "06": { chef: "Nice", extras: [] },
+    "07": { chef: "Privas", extras: [] },
+    "08": { chef: "Charleville-Mézières", extras: ["Charleville", "Charleville Mezieres", "Mezieres"] },
+    "09": { chef: "Foix", extras: [] },
+    "10": { chef: "Troyes", extras: [] },
+    "11": { chef: "Carcassonne", extras: [] },
+    "12": { chef: "Rodez", extras: [] },
+    "13": { chef: "Marseille", extras: [] },
+    "14": { chef: "Caen", extras: [] },
+    "15": { chef: "Aurillac", extras: [] },
+    "16": { chef: "Angoulême", extras: ["Angouleme"] },
+    "17": { chef: "La Rochelle", extras: ["Rochelle"] },
+    "18": { chef: "Bourges", extras: [] },
+    "19": { chef: "Tulle", extras: [] },
+    "2A": { chef: "Ajaccio", extras: [] },
+    "2B": { chef: "Bastia", extras: [] },
+    "21": { chef: "Dijon", extras: [] },
+    "22": { chef: "Saint-Brieuc", extras: ["St-Brieuc", "St Brieuc"] },
+    "23": { chef: "Guéret", extras: ["Gueret"] },
+    "24": { chef: "Périgueux", extras: ["Perigueux"] },
+    "25": { chef: "Besançon", extras: ["Besancon"] },
+    "26": { chef: "Valence", extras: [] },
+    "27": { chef: "Évreux", extras: ["Evreux"] },
+    "28": { chef: "Chartres", extras: [] },
+    "29": { chef: "Quimper", extras: [] },
+    "30": { chef: "Nîmes", extras: ["Nimes"] },
+    "31": { chef: "Toulouse", extras: [] },
+    "32": { chef: "Auch", extras: [] },
+    "33": { chef: "Bordeaux", extras: [] },
+    "34": { chef: "Montpellier", extras: [] },
+    "35": { chef: "Rennes", extras: [] },
+    "36": { chef: "Châteauroux", extras: ["Chateauroux"] },
+    "37": { chef: "Tours", extras: [] },
+    "38": { chef: "Grenoble", extras: [] },
+    "39": { chef: "Lons-le-Saunier", extras: ["Lons", "Lons le Saunier"] },
+    "40": { chef: "Mont-de-Marsan", extras: ["Mont de Marsan"] },
+    "41": { chef: "Blois", extras: [] },
+    "42": { chef: "Saint-Étienne", extras: ["St-Étienne", "St Etienne", "Saint Etienne", "St-Etienne"] },
+    "43": { chef: "Le Puy-en-Velay", extras: ["Le Puy", "Puy en Velay", "Puy", "Le Puy en Velay"] },
+    "44": { chef: "Nantes", extras: [] },
+    "45": { chef: "Orléans", extras: ["Orleans"] },
+    "46": { chef: "Cahors", extras: [] },
+    "47": { chef: "Agen", extras: [] },
+    "48": { chef: "Mende", extras: [] },
+    "49": { chef: "Angers", extras: [] },
+    "50": { chef: "Saint-Lô", extras: ["St-Lô", "St Lo", "Saint Lo", "St-Lo"] },
+    "51": { chef: "Châlons-en-Champagne", extras: ["Chalons en Champagne", "Chalons", "Châlons"] },
+    "52": { chef: "Chaumont", extras: [] },
+    "53": { chef: "Laval", extras: [] },
+    "54": { chef: "Nancy", extras: [] },
+    "55": { chef: "Bar-le-Duc", extras: ["Bar le Duc"] },
+    "56": { chef: "Vannes", extras: [] },
+    "57": { chef: "Metz", extras: [] },
+    "58": { chef: "Nevers", extras: [] },
+    "59": { chef: "Lille", extras: [] },
+    "60": { chef: "Beauvais", extras: [] },
+    "61": { chef: "Alençon", extras: ["Alencon"] },
+    "62": { chef: "Arras", extras: [] },
+    "63": { chef: "Clermont-Ferrand", extras: ["Clermont", "Clermont Ferrand"] },
+    "64": { chef: "Pau", extras: [] },
+    "65": { chef: "Tarbes", extras: [] },
+    "66": { chef: "Perpignan", extras: [] },
+    "67": { chef: "Strasbourg", extras: [] },
+    "68": { chef: "Colmar", extras: [] },
+    "69": { chef: "Lyon", extras: [] },
+    "70": { chef: "Vesoul", extras: [] },
+    "71": { chef: "Mâcon", extras: ["Macon"] },
+    "72": { chef: "Le Mans", extras: ["Mans"] },
+    "73": { chef: "Chambéry", extras: ["Chambery"] },
+    "74": { chef: "Annecy", extras: [] },
+    "75": { chef: "Paris", extras: [] },
+    "76": { chef: "Rouen", extras: [] },
+    "77": { chef: "Melun", extras: [] },
+    "78": { chef: "Versailles", extras: [] },
+    "79": { chef: "Niort", extras: [] },
+    "80": { chef: "Amiens", extras: [] },
+    "81": { chef: "Albi", extras: [] },
+    "82": { chef: "Montauban", extras: [] },
+    "83": { chef: "Toulon", extras: [] },
+    "84": { chef: "Avignon", extras: [] },
+    "85": { chef: "La Roche-sur-Yon", extras: ["Roche sur Yon", "La Roche sur Yon", "La Roche"] },
+    "86": { chef: "Poitiers", extras: [] },
+    "87": { chef: "Limoges", extras: [] },
+    "88": { chef: "Épinal", extras: ["Epinal"] },
+    "89": { chef: "Auxerre", extras: [] },
+    "90": { chef: "Belfort", extras: [] },
+    "91": { chef: "Évry-Courcouronnes", extras: ["Évry", "Evry", "Evry-Courcouronnes", "Evry Courcouronnes"] },
+    "92": { chef: "Nanterre", extras: [] },
+    "93": { chef: "Bobigny", extras: [] },
+    "94": { chef: "Créteil", extras: ["Creteil"] },
+    "95": { chef: "Cergy", extras: ["Pontoise", "Cergy-Pontoise", "Cergy Pontoise"] },
+    "971": { chef: "Basse-Terre", extras: ["Basse Terre"] },
+    "972": { chef: "Fort-de-France", extras: ["Fort de France"] },
+    "973": { chef: "Cayenne", extras: [] },
+    "974": { chef: "Saint-Denis", extras: ["St Denis", "St-Denis", "Saint Denis de la Reunion"] },
+    "976": { chef: "Mamoudzou", extras: [] },
+};
+
+allQuestions.departementsnoms = _DEPARTEMENTS.map(d => ({
+    text: d.name,
+    answer: d.num,
+    acceptedAnswers: _acceptedNumeros(d.num),
+    difficulty: d.diff,
+}));
+
+allQuestions.departementsnumeros = _DEPARTEMENTS.map(d => ({
+    text: d.num,
+    answer: d.name,
+    acceptedAnswers: _acceptedNoms(d.name),
+    difficulty: d.diff,
+}));
+
+
+// =====================================================================
+// THÈMES "CAPITALES" — basés sur _COUNTRIES (191 pays)
+//   - capitales       : on affiche le PAYS, on attend la CAPITALE
+//   - capitalespays   : on affiche la CAPITALE, on attend le PAYS
+// =====================================================================
+allQuestions.capitales = _COUNTRIES.map(c => ({
+    text: c.name,
+    answer: c.capital,
+    acceptedAnswers: _acceptedNoms(c.capital, c.extraCapital || []),
+    difficulty: c.diff,
+}));
+
+allQuestions.capitalespays = _COUNTRIES.map(c => ({
+    text: c.capital,
+    answer: c.name,
+    acceptedAnswers: _acceptedNoms(c.name, c.extraCountry || []),
+    difficulty: c.diff,
+}));
+
+
+// =====================================================================
+// THÈMES "CHEFS-LIEUX" — basés sur _DEPARTEMENTS + _CHEFS_LIEUX_MAP
+//   - chefslieux      : on affiche le NOM du département, on attend le chef-lieu
+//   - chefslieuxnoms  : on affiche le CHEF-LIEU, on attend le nom du département
+// =====================================================================
+allQuestions.chefslieux = _DEPARTEMENTS.map(d => {
+    const cl = _CHEFS_LIEUX_MAP[d.num];
+    return {
+        text: d.name,
+        answer: cl.chef,
+        acceptedAnswers: _acceptedNoms(cl.chef, cl.extras || []),
+        difficulty: d.diff,
+    };
+});
+
+allQuestions.chefslieuxnoms = _DEPARTEMENTS.map(d => {
+    const cl = _CHEFS_LIEUX_MAP[d.num];
+    return {
+        text: cl.chef,
+        answer: d.name,
+        acceptedAnswers: _acceptedNoms(d.name),
+        difficulty: d.diff,
+    };
+});
+
+
+// =====================================================================
+// BANQUE DE QUESTIONS — MODE QUIZ CULTURE GÉNÉRALE (chargée depuis quiz-questions.json)
+// =====================================================================
+const quizQuestions = JSON.parse(
+    fs.readFileSync(path.join(__dirname, 'quiz-questions.json'), 'utf8')
+);
+
+// Ensemble de tous les thèmes disponibles par mode
+const IMAGE_THEMES = Object.keys(allQuestions);
+const QUIZ_THEMES = Object.keys(quizQuestions);
+
+// On mélange les questions dès que le serveur s'allume
+shuffle(questions);
+
+// let currentTheme = null;
+let currentQuestionIndex = 0;
+// let players = {}; // Pour stocker les infos des joueurs
+// let activePlayerId = null;
+let gameInterval = null;
+
+io.on('connection', (socket) => {
+    console.log(`Joueur connecté : ${socket.id}`);
+
+    // --- MATCHMAKING ---
+    socket.on('join-matchmaking', (data) => {
+        socket.nickname = "Joueur #" + socket.id.substring(0, 4);
+        socket.elo = 1000;
+        socket.avatarConfig = (data && data.avatar) ? data.avatar : null;
+
+        // Valider les formats acceptés (tableau de 1, 3 et/ou 5)
+        const raw = Array.isArray(data && data.acceptedRounds) ? data.acceptedRounds : [];
+        const acceptedRounds = raw.filter(r => [1, 3, 5].includes(r));
+        if (acceptedRounds.length === 0) acceptedRounds.push(3); // fallback
+
+        // Chercher dans la file quelqu'un avec au moins un format en commun
+        const opponentIdx = matchmakingQueue.findIndex(entry =>
+            entry.acceptedRounds.some(r => acceptedRounds.includes(r))
+        );
+
+        if (opponentIdx !== -1) {
+            // Adversaire trouvé
+            const [opponent] = matchmakingQueue.splice(opponentIdx, 1);
+            const p1 = opponent.socket;
+            const p2 = socket;
+
+            // Formats communs → choisir au hasard
+            const commonRounds = opponent.acceptedRounds.filter(r => acceptedRounds.includes(r));
+            const rounds = commonRounds[Math.floor(Math.random() * commonRounds.length)];
+            const winsNeeded = Math.ceil(rounds / 2);
+
+            const code = "MATCH-" + generateRoomCode();
+            p1.join(code);
+            p2.join(code);
+
+            const mode = Math.random() < 0.5 ? 'images' : 'quiz';
+            let selectedTheme, selectedQuestions;
+            if (mode === 'quiz') {
+                selectedTheme = QUIZ_THEMES[Math.floor(Math.random() * QUIZ_THEMES.length)];
+                selectedQuestions = shuffleByDifficulty([...quizQuestions[selectedTheme]]);
+            } else {
+                selectedTheme = IMAGE_THEMES[Math.floor(Math.random() * IMAGE_THEMES.length)];
+                selectedQuestions = shuffleByDifficulty([...allQuestions[selectedTheme]]);
+            }
+            const players = [p1.id, p2.id].sort(() => Math.random() - 0.5);
+
+            rooms[code] = {
+                players,
+                settings: {
+                    mode,
+                    theme: selectedTheme,
+                    timer: 60,
+                    rounds,
+                    winsNeeded,
+                    score: { [players[0]]: 0, [players[1]]: 0 },
+                    matchHistory: [],
+                    currentRound: 1,
+                    nextRoundStarterId: null,
+                    matchAnswers: []
+                },
+                avatars: {
+                    [p1.id]: p1.avatarConfig || null,
+                    [p2.id]: p2.avatarConfig || null
+                },
+                gameState: {
+                    questions: selectedQuestions,
+                    currentQuestionIndex: 0,
+                    activePlayerId: players[0],
+                    times: { [players[0]]: 60, [players[1]]: 60 }
+                }
+            };
+
+            io.to(code).emit('match-found', {
+                p1Name: p1.nickname,
+                p2Name: p2.nickname,
+                mode,
+                theme: selectedTheme,
+                activePlayerId: players[0],
+                roomCode: code
+            });
+            console.log(`Match trouvé ! BO${rounds} — ${code}`);
+        } else {
+            // Pas d'adversaire compatible → rejoindre la file
+            matchmakingQueue.push({ socket, acceptedRounds });
+            console.log(`File d'attente : ${matchmakingQueue.length} joueur(s)`);
+        }
+    });
+
+    // --- 1. CRÉER UNE PARTIE ---
+    socket.on('create-room', (data) => {
+        const code = generateRoomCode();
+        socket.join(code);
+        const avatarConfig = (data && data.avatar) ? data.avatar : null;
+
+        rooms[code] = {
+            host: socket.id,
+            players: [socket.id],
+            avatars: { [socket.id]: avatarConfig },
+            settings: { theme: 'athletes', timer: 45 },
+            gameState: {}, // On stockera les infos de la partie ici
+            previousHostId: null // utilisé pour réattribuer le rôle d'hôte à un revenant
+        };
+
+        // Payload objet : { code } sans matchState pour une création neuve.
+        // Le client accepte aussi l'ancienne forme (string) pour compat.
+        socket.emit('room-created', { code });
+    });
+
+    // --- 2. REJOINDRE UNE PARTIE ---
+    socket.on('join-room', (payload) => {
+        // Compatibilité : payload peut être une string (code) ou un objet { code, avatar }
+        let code, avatarConfig = null;
+        if (typeof payload === 'string') {
+            code = payload;
+        } else if (payload && typeof payload === 'object') {
+            code = payload.code;
+            avatarConfig = payload.avatar || null;
+        }
+        if (!code) return;
+        code = code.toUpperCase();
+
+        if (!rooms[code]) {
+            socket.emit('error-message', "Code invalide ou partie introuvable.");
+            return;
+        }
+
+        const room = rooms[code];
+
+        // Cas 1 : salon resté vacant (l'hôte précédent a quitté seul) → le
+        // joueur qui entre ici reprend le rôle d'hôte. On annule le timeout
+        // de suppression et on remappe l'éventuel ID de l'ancien hôte vers
+        // ce nouveau socket pour préserver son score et ses réponses.
+        if (room.players.length === 0) {
+            cancelRoomCleanup(room);
+
+            if (room.previousHostId) {
+                remapPlayerId(room, room.previousHostId, socket.id);
+                room.previousHostId = null;
+            }
+
+            socket.join(code);
+            room.players.push(socket.id);
+            room.host = socket.id;
+            if (!room.avatars) room.avatars = {};
+            room.avatars[socket.id] = avatarConfig;
+
+            // Le client reçoit room-created (donc deviendra hôte côté UI) avec
+            // l'état du match en cours s'il y en avait un.
+            socket.emit('room-created', {
+                code,
+                matchState: buildLobbyMatchState(room)
+            });
+            return;
+        }
+
+        // Cas 2 : un joueur est déjà présent → on rejoint comme invité.
+        if (room.players.length < 2) {
+            socket.join(code);
+            room.players.push(socket.id);
+            if (!room.avatars) room.avatars = {};
+            room.avatars[socket.id] = avatarConfig;
+
+            socket.emit('room-joined', {
+                code,
+                matchState: buildLobbyMatchState(room)
+            });
+            io.to(code).emit('room-update', {
+                playerCount: room.players.length,
+                hostId: room.host
+            });
+            return;
+        }
+
+        // Cas 3 : salon plein.
+        socket.emit('error-message', "Cette partie est déjà pleine !");
+    });
+
+    // --- 3. LANCER LA PARTIE DEPUIS LE LOBBY ---
+    /* socket.on('start-custom-game', (data) => {
+        const room = rooms[data.code];
+
+        // On s'assure que c'est bien l'hôte qui lance la partie
+        if (room && room.host === socket.id) {
+            room.settings.theme = data.theme;
+            room.settings.timer = data.timer;
+
+            // On prépare le jeu spécifique à cette Room
+            room.gameState = {
+                questions: shuffle([...allQuestions[data.theme]]),
+                currentQuestionIndex: 0,
+                activePlayerId: room.players[0], // L'hôte commence
+                times: {}
+            };
+
+            // On attribue le temps choisi aux deux joueurs
+            room.players.forEach(pId => {
+                room.gameState.times[pId] = data.timer;
+            });
+
+            // On prévient les deux joueurs que la partie démarre
+            io.to(data.code).emit('init-game', {
+                theme: data.theme,
+                question: room.gameState.questions[0],
+                times: room.gameState.times,
+                activePlayerId: room.gameState.activePlayerId
+            });
+
+            // --- LANCEMENT DU CHRONO DE LA ROOM ---
+            room.gameState.timerInterval = setInterval(() => {
+                const activeId = room.gameState.activePlayerId;
+
+                if (activeId && room.gameState.times[activeId] > 0) {
+                    room.gameState.times[activeId] -= 1;
+
+                    // Si le temps est écoulé
+                    if (room.gameState.times[activeId] <= 0) {
+                        clearInterval(room.gameState.timerInterval);
+                        const winnerId = room.players.find(id => id !== activeId);
+                        io.to(data.code).emit('game-over', { winnerId: winnerId });
+                    } else {
+                        // Mise à jour de l'affichage
+                        io.to(data.code).emit('timer-update', room.gameState.times);
+                    }
+                }
+            }, 1000);
+
+        }
+    });*/
+
+    // --- LIVE SYNC : l'hôte modifie les paramètres → on prévient les autres joueurs du salon
+    socket.on('lobby-settings-update', (data) => {
+        if (!data || !data.code) return;
+        const room = rooms[data.code];
+        if (!room) return;
+        // Seul l'hôte peut diffuser des modifications de paramètres
+        if (room.host !== socket.id) return;
+        // Rebroadcast aux autres joueurs du salon (pas à l'hôte lui-même)
+        socket.to(data.code).emit('lobby-settings-update', {
+            mode: data.mode,
+            theme: data.theme,
+            timer: data.timer,
+            rounds: data.rounds
+        });
+    });
+
+    // --- 3. LANCER LA PARTIE (Lobby Privé) ---
+    socket.on('start-game', (data) => {
+        const room = rooms[data.code];
+        if (!room) return;
+
+        // Tuer tout timer zombie
+        if (room.gameState && room.gameState.timerInterval) clearInterval(room.gameState.timerInterval);
+        if (room.gameState && room.gameState.transitionTimeout) clearTimeout(room.gameState.transitionTimeout);
+        if (room.gameState && room.gameState.startGameTimeout) clearTimeout(room.gameState.startGameTimeout);
+
+        const mode = data.mode || 'images';
+        room.settings.theme = data.theme;
+        room.settings.timer = parseInt(data.timer);
+        room.settings.mode = mode;
+
+        // Un matchHistory défini = continuation d'un match en cours
+        // (les manches gagnantes, le score et l'historique sont conservés)
+        const isContinuation = Array.isArray(room.settings.matchHistory);
+
+        if (!isContinuation) {
+            // Nouveau match : initialiser toutes les données de match
+            const requestedRounds = parseInt(data.rounds, 10);
+            const rounds = [1, 3, 5].includes(requestedRounds) ? requestedRounds : 1;
+            room.settings.rounds = rounds;
+            room.settings.winsNeeded = Math.ceil(rounds / 2);
+            room.settings.score = { [room.players[0]]: 0, [room.players[1]]: 0 };
+            room.settings.matchHistory = [];
+            room.settings.currentRound = 1;
+            room.settings.nextRoundStarterId = null;
+            room.settings.matchAnswers = [];
+        }
+
+        let selectedQuestions;
+        if (mode === 'quiz' && data.theme === 'quiztout') {
+            // "Tout" : on combine les questions de tous les thèmes quiz
+            const allQuizQuestions = QUIZ_THEMES.flatMap(theme => quizQuestions[theme]);
+            selectedQuestions = shuffleByDifficulty([...allQuizQuestions]);
+        } else if (mode === 'quiz' && quizQuestions[data.theme]) {
+            selectedQuestions = shuffleByDifficulty([...quizQuestions[data.theme]]);
+        } else if (allQuestions[data.theme]) {
+            selectedQuestions = shuffleByDifficulty([...allQuestions[data.theme]]);
+        } else {
+            selectedQuestions = shuffleByDifficulty([...allQuestions['athletes']]);
+        }
+
+        // Pour une continuation, le perdant de la manche précédente commence
+        const activePlayerId = isContinuation
+            ? (room.settings.nextRoundStarterId || room.players[0])
+            : room.players[0];
+
+        room.gameState = {
+            questions: selectedQuestions,
+            currentQuestionIndex: 0,
+            activePlayerId,
+            times: {
+                [room.players[0]]: room.settings.timer,
+                [room.players[1]]: room.settings.timer
+            }
+        };
+
+        startGame(data.code);
+    });
+
+    // Petite fonction pour trouver la room d'un joueur
+    function getPlayerRoom(socketId) {
+        for (const code in rooms) {
+            if (rooms[code].players.includes(socketId)) return code;
+        }
+        return null;
+    }
+
+    // --- 3.1 RÉPONDRE À UNE QUESTION ---
+    socket.on('submit-answer', (guess) => {
+        const code = getPlayerRoom(socket.id);
+        if (!code) return;
+
+        const room = rooms[code];
+        if (!room || !room.gameState) return; // partie déjà annulée / terminée
+        const state = room.gameState;
+
+        // On vérifie que c'est bien son tour
+        if (state.activePlayerId !== socket.id) return;
+
+        const currentQ = state.questions[state.currentQuestionIndex];
+        const respondingPlayer = socket.id;
+
+        // Vérifie la réponse principale ET toutes les variantes acceptedAnswers
+        const normalizedGuess = normalize(guess);
+        const accepted = currentQ.acceptedAnswers && currentQ.acceptedAnswers.length > 0
+            ? currentQ.acceptedAnswers
+            : [currentQ.answer];
+        const isCorrect = accepted.some(a => normalize(a) === normalizedGuess);
+
+        if (isCorrect) {
+            // Enregistrer cette question dans l'historique des réponses du match.
+            // On fait ça AVANT d'incrémenter currentQuestionIndex pour bien tenir
+            // la question qui vient d'être trouvée, pas la suivante.
+            room.settings.matchAnswers = room.settings.matchAnswers || [];
+            room.settings.matchAnswers.push({
+                question: currentQ,
+                mode: room.settings.mode || 'images',
+                outcome: 'correct',
+                playerId: respondingPlayer,
+                round: room.settings.currentRound || 1
+            });
+
+            // Figer le temps exact du joueur actif avant de changer de tour.
+            // Sans ça, state.times garde la dernière seconde entière envoyée
+            // par setInterval et le client voit le chrono remonter après réponse.
+            freezeActiveTimer(state);
+
+            state.currentQuestionIndex++;
+
+            // Stopper le setInterval AVANT d'émettre next-round : sans ça,
+            // le tick suivant (jusqu'à 1s plus tard) décrémente encore le
+            // timer et envoie un timer-update qui fait sauter le chrono client.
+            if (state.timerInterval) {
+                clearInterval(state.timerInterval);
+                state.timerInterval = null;
+            }
+
+            // Changement de joueur
+            state.activePlayerId = room.players.find(id => id !== socket.id);
+
+            io.to(code).emit('next-round', {
+                nextQuestion: state.questions[state.currentQuestionIndex],
+                activePlayerId: state.activePlayerId,
+                times: state.times,
+                correctPlayerId: respondingPlayer,
+                matchAnswers: room.settings.matchAnswers
+            });
+
+            // Relancer le timer sur le nouveau joueur actif.
+            startRoundTimer(code);
+        } else {
+            // Mauvaise réponse : informer les deux clients pour déclencher l'animation "lose"
+            io.to(code).emit('wrong-answer', { playerId: respondingPlayer });
+        }
+    });
+
+    // --- 3.2 PASSER LA QUESTION ---
+    socket.on('pass-question', () => {
+        const code = getPlayerRoom(socket.id);
+        if (!code) return;
+
+        const room = rooms[code];
+        if (!room || !room.gameState) return; // partie déjà annulée / terminée
+        const state = room.gameState;
+
+        // Sécurité : si ce n'est pas son tour, on bloque
+        if (state.activePlayerId !== socket.id) return;
+
+        // Enregistrer la question passée dans l'historique (avant d'incrémenter l'index)
+        const passedQuestion = state.questions[state.currentQuestionIndex];
+        if (passedQuestion) {
+            room.settings.matchAnswers = room.settings.matchAnswers || [];
+            room.settings.matchAnswers.push({
+                question: passedQuestion,
+                mode: room.settings.mode || 'images',
+                outcome: 'passed',
+                playerId: socket.id,
+                round: room.settings.currentRound || 1
+            });
+        }
+
+        // Notifier les deux clients pour déclencher les pleurs sur celui qui passe
+        io.to(code).emit('passing', { playerId: socket.id });
+
+        // Figer le temps exact avant de passer : le joueur reste actif, mais son
+        // chrono doit repartir de la vraie valeur courante, pas de la seconde entière.
+        freezeActiveTimer(state);
+
+        // Passer directement à la question suivante
+        state.currentQuestionIndex++;
+
+        // Même chose que pour une bonne réponse : stopper le tick avant
+        // d'émettre next-round pour éviter un timer-update parasite.
+        if (state.timerInterval) {
+            clearInterval(state.timerInterval);
+            state.timerInterval = null;
+        }
+
+        io.to(code).emit('next-round', {
+            nextQuestion: state.questions[state.currentQuestionIndex],
+            activePlayerId: state.activePlayerId,
+            times: state.times,
+            matchAnswers: room.settings.matchAnswers || []
+        });
+
+        // Relancer le timer sur le joueur actif (inchangé lors d'un pass).
+        startRoundTimer(code);
+    });
+
+    // --- 3.3 DÉMARRAGE APRÈS MATCHMAKING ---
+    socket.on('matchmaking-ready', (data) => {
+        const room = rooms[data.code];
+
+        // Sécurité : Seul le joueur qui doit commencer peut déclencher le départ 
+        // pour éviter que l'événement soit reçu deux fois.
+        if (room && room.gameState.activePlayerId === socket.id) {
+            console.log(`Le match ${data.code} commence !`);
+            startGame(data.code);
+        }
+    });
+
+    // --- 3.4 INTERROMPRE UNE PARTIE EN COURS (bouton retour pendant le duel) ---
+    // Le joueur reste dans la room (donc dans le lobby), mais la partie est annulée :
+    // on tue le timer côté serveur et on prévient l'autre joueur pour qu'il revienne
+    // aussi au lobby (sinon il se retrouverait seul avec un chrono qui descend).
+    socket.on('abort-game', () => {
+        const code = getPlayerRoom(socket.id);
+        if (!code) return;
+        const room = rooms[code];
+        if (!room || !room.gameState) return; // déjà terminée / annulée
+
+        if (room.gameState.timerInterval) {
+            clearInterval(room.gameState.timerInterval);
+        }
+        if (room.gameState.transitionTimeout) {
+            clearTimeout(room.gameState.transitionTimeout);
+        }
+        // Pendant l'écran de transition (3-2-1), le chrono n'a pas encore démarré :
+        // il faut annuler le setTimeout sinon il déclenchera startRoundTimer dans
+        // une partie déjà annulée.
+        if (room.gameState.startGameTimeout) {
+            clearTimeout(room.gameState.startGameTimeout);
+        }
+        room.gameState = null;
+
+        // Prévenir l'autre joueur de la room (pas soi-même)
+        socket.to(code).emit('opponent-aborted');
+        console.log(`Partie de la room ${code} annulée par ${socket.id}.`);
+    });
+
+    // --- 4. QUITTER UNE ROOM VOLONTAIREMENT (bouton retour du lobby) ---
+    socket.on('leave-room', (data) => {
+        const code = data && data.code ? data.code.toUpperCase() : null;
+        if (!code || !rooms[code]) return;
+
+        const room = rooms[code];
+        const index = room.players.indexOf(socket.id);
+        if (index === -1) return;
+
+        const wasHost = (room.host === socket.id);
+
+        // Retirer le joueur de la room et du canal Socket.IO
+        room.players.splice(index, 1);
+        if (room.avatars) delete room.avatars[socket.id];
+        socket.leave(code);
+
+        if (room.players.length === 0) {
+            // Plus personne, mais on ne supprime pas la room tout de suite :
+            // l'hôte peut revenir en saisissant son code. On nettoie en revanche
+            // la partie en cours (timers, gameState) — l'état du match
+            // (matchHistory, score, matchAnswers, rounds) reste intact dans
+            // room.settings pour être restauré au retour.
+            cleanupGameTimers(room);
+            room.host = null;
+            // On mémorise l'ID du dernier hôte pour pouvoir réattribuer son
+            // score / ses réponses à son nouveau socket.id au retour.
+            if (wasHost) {
+                room.previousHostId = socket.id;
+            }
+            scheduleRoomCleanup(code);
+            console.log(`Room ${code} maintenue vacante (TTL ${ROOM_VACANT_TTL_MS / 1000}s).`);
+        } else {
+            // Il reste un joueur : si l'hôte est parti, on transfère le rôle.
+            if (wasHost) {
+                room.host = room.players[0];
+            }
+            io.to(code).emit('room-update', {
+                playerCount: room.players.length,
+                hostId: room.host
+            });
+            console.log(`Joueur ${socket.id} a quitté la room ${code}. Reste ${room.players.length} joueur(s).`);
+        }
+    });
+
+    // --- 4bis. QUITTER LA FILE DE MATCHMAKING ---
+    socket.on('leave-matchmaking', () => {
+        const idx = matchmakingQueue.findIndex(e => e.socket === socket);
+        if (idx !== -1) {
+            matchmakingQueue.splice(idx, 1);
+            console.log(`Joueur ${socket.id} a quitté la file. Reste ${matchmakingQueue.length} joueur(s).`);
+        }
+    });
+
+    // --- 5. DÉCONNEXION ---
+    socket.on('disconnect', () => {
+        // Retirer de la file de matchmaking si en attente
+        const qIdx = matchmakingQueue.findIndex(e => e.socket === socket);
+        if (qIdx !== -1) matchmakingQueue.splice(qIdx, 1);
+        // Retirer des rooms si en partie — même logique que leave-room :
+        // on conserve un salon vacant pour permettre une reconnexion.
+        for (const code in rooms) {
+            const room = rooms[code];
+            const index = room.players.indexOf(socket.id);
+            if (index === -1) continue;
+
+            const wasHost = (room.host === socket.id);
+            const isMatchmakingRoom = code.startsWith('MATCH-');
+
+            room.players.splice(index, 1);
+            if (room.avatars) delete room.avatars[socket.id];
+
+            if (room.players.length === 0) {
+                if (isMatchmakingRoom) {
+                    // Les salons MATCH- sont éphémères : on les supprime
+                    // immédiatement (pas de reconnexion possible avec un code).
+                    cleanupGameTimers(room);
+                    delete rooms[code];
+                } else {
+                    // Salon privé : on garde le salon vacant pour permettre
+                    // un retour de l'hôte via l'écran d'accueil.
+                    cleanupGameTimers(room);
+                    room.host = null;
+                    if (wasHost) room.previousHostId = socket.id;
+                    scheduleRoomCleanup(code);
+                }
+            } else {
+                if (wasHost) room.host = room.players[0];
+                io.to(code).emit('room-update', {
+                    playerCount: room.players.length,
+                    hostId: room.host
+                });
+            }
+            break;
+        }
+        console.log(`Joueur déconnecté : ${socket.id}`);
+    });
+});
+
+// On récupère le port donné par Render, ou 3000 par défaut
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Le serveur tourne sur le port ${PORT}`);
+});

@@ -1,0 +1,9 @@
+THÈME RÉGIONS (CARTE) — RAPPORT
+Projet : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree
+GeoJSON : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree\regions-50m.geojson.txt
+Images générées : 13 / 13
+Bloc JS : C:\Users\Alexis\Desktop\Alexis\le_duel_version_integree\regions_carte.generated.js
+Fichiers patchés : server.js, script.js, index.html
+
+RÉGIONS MANQUANTES / ERREURS
+Aucun
