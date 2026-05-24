@@ -39,7 +39,7 @@
       <div class="top-player-avatar" id="top-player-avatar"></div>
       <div class="top-player-text">
         <strong>JOUEUR</strong>
-        <span>Niveau 12</span>
+        <span>12</span>
         <i></i>
       </div>
     </button>
@@ -186,43 +186,59 @@
   </section>
 
   <!-- ÉCRAN 3 : LOBBY -->
-  <section id="lobby-container" class="screen-panel menu-box lobby-screen" style="display:none;">
-    <button class="btn-back" id="btn-back-lobby" type="button">← Retour</button>
+  <section id="lobby-container" class="screen-panel lobby-screen-wrapper" style="display:none;">
 
+    <!-- Fantôme invisible : équilibre la flexbox pour que .lobby-main soit
+         vraiment centré sur l'écran (mêmes 280px à gauche que le panneau à droite) -->
+    <div class="lobby-spacer-left" aria-hidden="true"></div>
 
-    <div class="match-header">
-      <img src="assets/logo.png" alt="Le Duel" class="game-logo">
-    </div>
+    <!-- ===== Bloc central : code + paramètres ===== -->
+    <div class="lobby-main menu-box lobby-screen">
+      <button class="btn-back" id="btn-back-lobby" type="button">← Retour</button>
 
     <div class="lobby-topline">
 
-      <p class="lobby-private-title">Salon privé</p>
-
-      <div class="lobby-code-block">
-        <div class="lobby-code-row">
-          <h2>Code : <span id="display-room-code" class="highlight">----</span></h2>
-          <button id="btn-copy-room-code" class="copy-code-btn" type="button">COPIER</button>
-        </div>
+      <div class="lobby-logo-side">
+        <img src="assets/logo.png" alt="Le Duel" class="lobby-logo-img">
       </div>
 
-      <div class="match-score-block" id="lobby-score-block" style="display:none;">
-        <p class="score-block-label">Score</p>
-        <div class="score-block-digits">
-          <span id="lobby-score-me">0</span>
-          <span class="score-block-sep"> – </span>
-          <span id="lobby-score-opp">0</span>
-        </div>
-      </div>
+      <div class="lobby-info-side">
+        <p class="lobby-private-title">Salon privé</p>
 
-      <div class="player-count-card">
-        <span id="room-player-count">1</span><small>/2 joueurs</small>
+        <div class="lobby-code-zone">
+          <div class="lobby-code-block">
+            <div class="lobby-code-row">
+              <h2>Code : <span id="display-room-code" class="highlight">----</span></h2>
+              <button id="btn-copy-room-code" class="copy-code-btn" type="button">COPIER</button>
+            </div>
+          </div>
+
+          <div class="match-score-block" id="lobby-score-block" style="display:none;">
+            <p class="score-block-label">Score</p>
+            <div class="score-block-digits">
+              <span id="lobby-score-me">0</span>
+              <span class="score-block-sep"> – </span>
+              <span id="lobby-score-opp">0</span>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>
+
 
     <div id="host-settings" class="host-settings-card">
       <div class="host-settings-header">
         <h3 id="settings-title">Paramètres de la partie</h3>
+
+        <button class="arcade-mode-toggle" id="btn-arcade-mode" type="button"
+                role="switch" aria-checked="false" aria-label="Activer le mode arcade">
+          <span class="arcade-toggle-switch" aria-hidden="true">
+            <span class="arcade-toggle-thumb"></span>
+          </span>
+          <span class="arcade-toggle-label">Mode Arcade</span>
+        </button>
+
         <button class="answers-toggle-btn" id="btn-show-answers" type="button" aria-label="Voir les réponses du match">
           <span class="answers-toggle-label">Réponses</span>
           <img src="assets/arrow-icon.png" alt="" class="answers-toggle-arrow" aria-hidden="true">
@@ -255,6 +271,21 @@
             <button class="choice-btn rounds-choice active-choice" data-rounds="3" type="button">BO3</button>
             <button class="choice-btn rounds-choice" data-rounds="5" type="button">BO5</button>
           </div>
+        </div>
+      </div>
+
+      <!-- ===== Bloc Format (visible uniquement en Mode Arcade) ===== -->
+      <div class="setting-block arcade-format-block" id="arcade-format-block" hidden>
+        <p class="setting-label setting-label-centered">Format</p>
+        <div class="choice-group choice-group-centered format-grid" id="format-choice-group">
+          <button class="choice-btn format-choice active-choice" data-format="1v1v1" type="button">Duel 1v1v1</button>
+          <button class="choice-btn format-choice" data-format="1v2" type="button">Duel 1v2</button>
+          <!-- 5 emplacements à compléter : il suffira de changer le texte et data-format -->
+          <button class="choice-btn format-choice format-placeholder" data-format="format4" type="button">Format 4</button>
+          <button class="choice-btn format-choice format-placeholder" data-format="format5" type="button">Format 5</button>
+          <button class="choice-btn format-choice format-placeholder" data-format="format6" type="button">Format 6</button>
+          <button class="choice-btn format-choice format-placeholder" data-format="format7" type="button">Format 7</button>
+          <button class="choice-btn format-choice format-placeholder" data-format="format8" type="button">Format 8</button>
         </div>
       </div>
 
@@ -322,6 +353,42 @@
       <p id="guest-waiting-note" class="guest-waiting-note" style="display:none;">⏳ En attente de l'hôte : il configure
         les paramètres et lancera le duel.</p>
     </div>
+    </div><!-- /.lobby-main -->
+
+    <!-- ===== Bloc latéral : joueurs & spectateurs ===== -->
+    <aside class="lobby-players-panel" id="lobby-players-panel" aria-label="Joueurs du salon">
+      <!-- En-tête : compteur X/Y Joueurs -->
+      <div class="lobby-panel-header lobby-panel-pill">
+        <span class="lobby-panel-pill-text">
+          <span id="lobby-active-count" class="lobby-panel-pill-x">0</span><!--
+       --><span id="lobby-active-max" class="lobby-panel-pill-yz">/0 Joueurs</span>
+        </span>
+      </div>
+
+      <!-- Zones de joueurs actifs : remplies dynamiquement par script.js -->
+      <div class="lobby-players-zone" id="lobby-players-zone"
+           data-slot="dropzone-active" aria-live="polite">
+        <!-- contenu généré : sections d'équipe + chips joueurs -->
+      </div>
+
+      <!-- Zone des spectateurs (dropdown) -->
+      <div class="lobby-spectators-section" id="lobby-spectators-section">
+        <button class="lobby-panel-pill lobby-spectators-toggle"
+                id="lobby-spectators-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="lobby-spectators-list"
+                data-slot="dropzone-spectator">
+          <span class="lobby-panel-pill-text lobby-spectators-label">Spectateurs</span>
+          <span class="lobby-spectators-count" id="lobby-spectators-count">0</span>
+          <span class="lobby-spectators-caret" aria-hidden="true">▼</span>
+        </button>
+        <div class="lobby-spectators-list" id="lobby-spectators-list"
+             data-slot="dropzone-spectator" hidden>
+          <!-- chips spectateurs -->
+        </div>
+      </div>
+    </aside>
   </section>
 
   <!-- ÉCRAN : RÉPONSES DU MATCH EN COURS -->

@@ -408,6 +408,188 @@ function buildLobbyMatchState(room) {
   };
 }
 
+// =============================================================
+// CONFIGURATION DES FORMATS DE DUEL (lobby privé)
+// -------------------------------------------------------------
+// Chaque format définit :
+//   - maxActivePlayers : nombre max de joueurs actifs dans la partie
+//   - teams : la liste des "slots" possibles pour un joueur actif.
+//     * ['free']             → liste plate, pas de notion d'équipe
+//     * ['team1','team2']    → 2 équipes flexibles (1v2, 2v3, …)
+// Le slot 'spectator' est toujours autorisé en plus.
+// =============================================================
+const FORMAT_CONFIG = {
+  '1v1':     { maxActivePlayers: 2,  teams: ['free'] },
+  '1v1v1':   { maxActivePlayers: 10, teams: ['free'] },
+  '1v2':     { maxActivePlayers: 10, teams: ['team1', 'team2'] },
+  // Placeholders pour les 5 autres formats arcade (à compléter plus tard).
+  'format4': { maxActivePlayers: 10, teams: ['free'] },
+  'format5': { maxActivePlayers: 10, teams: ['free'] },
+  'format6': { maxActivePlayers: 10, teams: ['free'] },
+  'format7': { maxActivePlayers: 10, teams: ['free'] },
+  'format8': { maxActivePlayers: 10, teams: ['free'] }
+};
+const MAX_SPECTATORS = 10;
+
+function getFormatConfig(format) {
+  return FORMAT_CONFIG[format] || FORMAT_CONFIG['1v1'];
+}
+
+// Initialise la structure room.lobby si elle n'existe pas encore (les anciens
+// salons créés avant cette version n'en ont pas).
+function ensureLobby(room) {
+  if (!room.lobby) {
+    room.lobby = {
+      slots: {},        // socketId → 'team1' | 'team2' | 'free' | 'spectator'
+      nicknames: {},    // socketId → pseudo affiché
+      format: '1v1',
+      arcadeMode: false,
+      maxActivePlayers: FORMAT_CONFIG['1v1'].maxActivePlayers
+    };
+  }
+  if (!room.spectators) room.spectators = [];
+  return room.lobby;
+}
+
+// Renvoie le slot par défaut à attribuer à un joueur qui rejoint un salon,
+// selon la place disponible et le format courant.
+function pickDefaultSlot(room) {
+  const cfg = getFormatConfig(room.lobby.format);
+  const activeCount = room.players.length;
+  // Pas de place côté joueurs actifs → on tombe en spectateur.
+  if (activeCount >= cfg.maxActivePlayers) return 'spectator';
+  // Format en équipes : équilibrer team1 / team2.
+  if (cfg.teams.length === 2) {
+    let n1 = 0, n2 = 0;
+    for (const sid of room.players) {
+      if (room.lobby.slots[sid] === 'team1') n1++;
+      else if (room.lobby.slots[sid] === 'team2') n2++;
+    }
+    return (n1 <= n2) ? 'team1' : 'team2';
+  }
+  // Format à liste plate.
+  return 'free';
+}
+
+// Re-distribue les joueurs actifs après un changement de format pour
+// respecter les contraintes (nombre max, slots autorisés).
+function rebalanceLobbyAfterFormatChange(room) {
+  const cfg = getFormatConfig(room.lobby.format);
+  room.lobby.maxActivePlayers = cfg.maxActivePlayers;
+
+  // 1) Si trop de joueurs actifs → les derniers arrivés passent spectateurs
+  while (room.players.length > cfg.maxActivePlayers) {
+    const sid = room.players.pop();
+    room.lobby.slots[sid] = 'spectator';
+    if (!room.spectators.includes(sid)) room.spectators.push(sid);
+  }
+
+  // 2) Re-mappe les slots des joueurs actifs vers ceux autorisés
+  if (cfg.teams.length === 1) {
+    // Liste plate : tout le monde sur 'free'
+    for (const sid of room.players) {
+      room.lobby.slots[sid] = cfg.teams[0];
+    }
+  } else {
+    // Équipes : si un joueur a un slot non-autorisé, le réassigner
+    // en équilibrant team1 / team2.
+    let n1 = 0, n2 = 0;
+    for (const sid of room.players) {
+      if (room.lobby.slots[sid] === 'team1') n1++;
+      else if (room.lobby.slots[sid] === 'team2') n2++;
+    }
+    for (const sid of room.players) {
+      const cur = room.lobby.slots[sid];
+      if (!cfg.teams.includes(cur)) {
+        if (n1 <= n2) { room.lobby.slots[sid] = 'team1'; n1++; }
+        else          { room.lobby.slots[sid] = 'team2'; n2++; }
+      }
+    }
+  }
+}
+
+// Construit le payload "lobby-state" envoyé à tous les clients du salon.
+function buildLobbyStatePayload(room) {
+  const lobby = room.lobby || {};
+  // Membres = joueurs actifs + spectateurs, dans l'ordre des arrivées.
+  const members = [];
+  for (const sid of room.players) {
+    members.push({
+      socketId: sid,
+      nickname: (lobby.nicknames && lobby.nicknames[sid]) || 'Joueur',
+      slot: (lobby.slots && lobby.slots[sid]) || 'free',
+      isHost: sid === room.host
+    });
+  }
+  for (const sid of (room.spectators || [])) {
+    members.push({
+      socketId: sid,
+      nickname: (lobby.nicknames && lobby.nicknames[sid]) || 'Joueur',
+      slot: 'spectator',
+      isHost: sid === room.host
+    });
+  }
+  return {
+    members,
+    format: lobby.format || '1v1',
+    arcadeMode: !!lobby.arcadeMode,
+    maxActivePlayers: lobby.maxActivePlayers || 2,
+    maxSpectators: MAX_SPECTATORS,
+    hostId: room.host
+  };
+}
+
+function broadcastLobbyState(code) {
+  const room = rooms[code];
+  if (!room) return;
+  io.to(code).emit('lobby-state', buildLobbyStatePayload(room));
+}
+
+// Déplace un membre du salon vers un slot cible. Retourne true si la
+// modification a eu lieu, false sinon (capacité, slot invalide, etc.).
+function moveLobbyMember(room, memberId, targetSlot) {
+  ensureLobby(room);
+  const cfg = getFormatConfig(room.lobby.format);
+  const allowedActiveSlots = cfg.teams;
+
+  // Vérifier que le slot cible est autorisé.
+  if (targetSlot !== 'spectator' && !allowedActiveSlots.includes(targetSlot)) {
+    return false;
+  }
+
+  // Localiser le membre.
+  const wasActive = room.players.includes(memberId);
+  const wasSpectator = room.spectators.includes(memberId);
+  if (!wasActive && !wasSpectator) return false;
+
+  // Capacité du slot cible.
+  if (targetSlot === 'spectator') {
+    if (wasSpectator) return false; // déjà spectateur, rien à faire
+    if (room.spectators.length >= MAX_SPECTATORS) return false;
+  } else {
+    // Slot actif : vérifier qu'il reste de la place.
+    if (wasActive) {
+      // Reste actif, juste un changement d'équipe : la place ne change pas.
+    } else {
+      if (room.players.length >= cfg.maxActivePlayers) return false;
+    }
+  }
+
+  // Appliquer la transition.
+  if (wasActive && targetSlot === 'spectator') {
+    const idx = room.players.indexOf(memberId);
+    if (idx !== -1) room.players.splice(idx, 1);
+    if (!room.spectators.includes(memberId)) room.spectators.push(memberId);
+  } else if (wasSpectator && targetSlot !== 'spectator') {
+    const idx = room.spectators.indexOf(memberId);
+    if (idx !== -1) room.spectators.splice(idx, 1);
+    if (!room.players.includes(memberId)) room.players.push(memberId);
+  }
+  // Mettre à jour le slot.
+  room.lobby.slots[memberId] = targetSlot;
+  return true;
+}
+
 // Nettoie tous les timers/timeouts associés à un gameState et le neutralise.
 function cleanupGameTimers(room) {
   if (!room || !room.gameState) return;
@@ -3393,6 +3575,10 @@ io.on('connection', async (socket) => {
 
   console.log(`Joueur connecté : ${socket.id}`);
 
+  // Garantir que socket.nickname est toujours défini, pour les flux qui ne passent
+  // pas par join-matchmaking (création / rejoindre un salon privé notamment).
+  socket.nickname = socket.username || ("Joueur #" + socket.id.substring(0, 4));
+
   // --- MATCHMAKING ---
   socket.on('join-matchmaking', (data) => {
     socket.nickname = socket.username || ("Joueur #" + socket.id.substring(0, 4));
@@ -3518,15 +3704,24 @@ io.on('connection', async (socket) => {
     rooms[code] = {
       host: socket.id,
       players: [socket.id],
+      spectators: [],
       avatars: { [socket.id]: avatarConfig },
       settings: { theme: 'athletes', timer: 45 },
       gameState: {}, // On stockera les infos de la partie ici
-      previousHostId: null // utilisé pour réattribuer le rôle d'hôte à un revenant
+      previousHostId: null, // utilisé pour réattribuer le rôle d'hôte à un revenant
+      lobby: {
+        slots: { [socket.id]: 'free' },
+        nicknames: { [socket.id]: socket.nickname || 'Joueur' },
+        format: '1v1',
+        arcadeMode: false,
+        maxActivePlayers: FORMAT_CONFIG['1v1'].maxActivePlayers
+      }
     };
 
     // Payload objet : { code } sans matchState pour une création neuve.
     // Le client accepte aussi l'ancienne forme (string) pour compat.
     socket.emit('room-created', { code });
+    broadcastLobbyState(code);
   });
 
   // --- 2. REJOINDRE UNE PARTIE ---
@@ -3567,21 +3762,44 @@ io.on('connection', async (socket) => {
       if (!room.avatars) room.avatars = {};
       room.avatars[socket.id] = avatarConfig;
 
+      // Lobby : (ré)initialisation des données utilisateur dans le salon.
+      ensureLobby(room);
+      room.lobby.slots[socket.id] = 'free';
+      const cfg = getFormatConfig(room.lobby.format);
+      if (cfg.teams.length === 2) room.lobby.slots[socket.id] = 'team1';
+      room.lobby.nicknames[socket.id] = socket.nickname || 'Joueur';
+
       // Le client reçoit room-created (donc deviendra hôte côté UI) avec
       // l'état du match en cours s'il y en avait un.
       socket.emit('room-created', {
         code,
         matchState: buildLobbyMatchState(room)
       });
+      broadcastLobbyState(code);
       return;
     }
 
-    // Cas 2 : un joueur est déjà présent → on rejoint comme invité.
-    if (room.players.length < 2) {
+    // Cas 2 : il reste de la place → on rejoint comme joueur actif ou
+    // spectateur selon la capacité du format en cours.
+    ensureLobby(room);
+    const cfg = getFormatConfig(room.lobby.format);
+    const canJoinAsActive = room.players.length < cfg.maxActivePlayers;
+    const canJoinAsSpectator = room.spectators.length < MAX_SPECTATORS;
+
+    if (canJoinAsActive || canJoinAsSpectator) {
       socket.join(code);
-      room.players.push(socket.id);
       if (!room.avatars) room.avatars = {};
       room.avatars[socket.id] = avatarConfig;
+      room.lobby.nicknames[socket.id] = socket.nickname || 'Joueur';
+
+      if (canJoinAsActive) {
+        const slot = pickDefaultSlot(room); // 'team1'/'team2'/'free'
+        room.players.push(socket.id);
+        room.lobby.slots[socket.id] = slot;
+      } else {
+        room.spectators.push(socket.id);
+        room.lobby.slots[socket.id] = 'spectator';
+      }
 
       socket.emit('room-joined', {
         code,
@@ -3591,10 +3809,11 @@ io.on('connection', async (socket) => {
         playerCount: room.players.length,
         hostId: room.host
       });
+      broadcastLobbyState(code);
       return;
     }
 
-    // Cas 3 : salon plein.
+    // Cas 3 : salon plein (joueurs actifs + spectateurs au max).
     socket.emit('error-message', "Cette partie est déjà pleine !");
   });
 
@@ -3657,12 +3876,69 @@ io.on('connection', async (socket) => {
     if (!room) return;
     // Seul l'hôte peut diffuser des modifications de paramètres
     if (room.host !== socket.id) return;
+
+    // Gestion du mode arcade + format (nouveau)
+    ensureLobby(room);
+    let formatChanged = false;
+    if (typeof data.arcadeMode === 'boolean') {
+      room.lobby.arcadeMode = data.arcadeMode;
+      // Quand l'arcade est désactivé, on retombe sur le format 1v1 classique.
+      if (!data.arcadeMode && room.lobby.format !== '1v1') {
+        room.lobby.format = '1v1';
+        formatChanged = true;
+      }
+    }
+    if (typeof data.format === 'string' && FORMAT_CONFIG[data.format]) {
+      if (room.lobby.format !== data.format) {
+        room.lobby.format = data.format;
+        formatChanged = true;
+      }
+    }
+    if (formatChanged) {
+      rebalanceLobbyAfterFormatChange(room);
+      // Si la capacité change, certains spectateurs pourraient devenir
+      // éligibles à passer actif — mais on laisse ça à l'initiative
+      // des joueurs eux-mêmes (via le drag & drop).
+      broadcastLobbyState(data.code);
+      io.to(data.code).emit('room-update', {
+        playerCount: room.players.length,
+        hostId: room.host
+      });
+    }
+
     // Rebroadcast aux autres joueurs du salon (pas à l'hôte lui-même)
     socket.to(data.code).emit('lobby-settings-update', {
       mode: data.mode,
       theme: data.theme,
       timer: data.timer,
-      rounds: data.rounds
+      rounds: data.rounds,
+      arcadeMode: data.arcadeMode,
+      format: data.format
+    });
+  });
+
+  // --- Déplacement d'un membre dans le lobby (équipe ↔ équipe ↔ spectateur) ---
+  socket.on('lobby-member-move', (data) => {
+    if (!data || !data.code) return;
+    const room = rooms[data.code];
+    if (!room) return;
+
+    const memberId = data.memberId;
+    const targetSlot = data.targetSlot;
+    if (!memberId || !targetSlot) return;
+
+    // Permissions : chacun peut se déplacer lui-même, l'hôte peut déplacer
+    // n'importe quel membre.
+    const isHost = (socket.id === room.host);
+    if (socket.id !== memberId && !isHost) return;
+
+    const ok = moveLobbyMember(room, memberId, targetSlot);
+    if (!ok) return;
+
+    broadcastLobbyState(data.code);
+    io.to(data.code).emit('room-update', {
+      playerCount: room.players.length,
+      hostId: room.host
     });
   });
 
@@ -3912,17 +4188,29 @@ io.on('connection', async (socket) => {
     if (!code || !rooms[code]) return;
 
     const room = rooms[code];
-    const index = room.players.indexOf(socket.id);
-    if (index === -1) return;
+    let index = room.players.indexOf(socket.id);
+    const wasActive = (index !== -1);
+    const wasSpectator = !wasActive && room.spectators && room.spectators.includes(socket.id);
+    if (!wasActive && !wasSpectator) return;
 
     const wasHost = (room.host === socket.id);
 
     // Retirer le joueur de la room et du canal Socket.IO
-    room.players.splice(index, 1);
+    if (wasActive) {
+      room.players.splice(index, 1);
+    } else if (wasSpectator) {
+      const sIdx = room.spectators.indexOf(socket.id);
+      if (sIdx !== -1) room.spectators.splice(sIdx, 1);
+    }
     if (room.avatars) delete room.avatars[socket.id];
+    if (room.lobby) {
+      delete room.lobby.slots[socket.id];
+      delete room.lobby.nicknames[socket.id];
+    }
     socket.leave(code);
 
-    if (room.players.length === 0) {
+    const totalRemaining = room.players.length + ((room.spectators && room.spectators.length) || 0);
+    if (totalRemaining === 0) {
       // Plus personne, mais on ne supprime pas la room tout de suite :
       // l'hôte peut revenir en saisissant son code. On nettoie en revanche
       // la partie en cours (timers, gameState) — l'état du match
@@ -3938,15 +4226,28 @@ io.on('connection', async (socket) => {
       scheduleRoomCleanup(code);
       console.log(`Room ${code} maintenue vacante (TTL ${ROOM_VACANT_TTL_MS / 1000}s).`);
     } else {
-      // Il reste un joueur : si l'hôte est parti, on transfère le rôle.
+      // Il reste quelqu'un : si l'hôte est parti, on transfère le rôle.
+      // Priorité à un joueur actif, sinon on promeut un spectateur (en
+      // le faisant passer actif) pour qu'il puisse piloter le lobby.
       if (wasHost) {
-        room.host = room.players[0];
+        if (room.players.length > 0) {
+          room.host = room.players[0];
+        } else if (room.spectators.length > 0) {
+          const promoted = room.spectators.shift();
+          room.players.push(promoted);
+          if (room.lobby) {
+            const cfg = getFormatConfig(room.lobby.format);
+            room.lobby.slots[promoted] = (cfg.teams[0] || 'free');
+          }
+          room.host = promoted;
+        }
       }
       io.to(code).emit('room-update', {
         playerCount: room.players.length,
         hostId: room.host
       });
-      console.log(`Joueur ${socket.id} a quitté la room ${code}. Reste ${room.players.length} joueur(s).`);
+      broadcastLobbyState(code);
+      console.log(`Membre ${socket.id} a quitté la room ${code}. Reste ${totalRemaining} membre(s).`);
     }
   });
 
@@ -3970,16 +4271,23 @@ io.on('connection', async (socket) => {
     }
     for (const code in rooms) {
       const room = rooms[code];
-      const index = room.players.indexOf(socket.id);
-      if (index === -1) continue;
+      const idxActive = room.players.indexOf(socket.id);
+      const idxSpec = (room.spectators || []).indexOf(socket.id);
+      if (idxActive === -1 && idxSpec === -1) continue;
 
       const wasHost = (room.host === socket.id);
       const isMatchmakingRoom = code.startsWith('MATCH-');
 
-      room.players.splice(index, 1);
+      if (idxActive !== -1) room.players.splice(idxActive, 1);
+      if (idxSpec !== -1) room.spectators.splice(idxSpec, 1);
       if (room.avatars) delete room.avatars[socket.id];
+      if (room.lobby) {
+        delete room.lobby.slots[socket.id];
+        delete room.lobby.nicknames[socket.id];
+      }
 
-      if (room.players.length === 0) {
+      const totalRemaining = room.players.length + ((room.spectators && room.spectators.length) || 0);
+      if (totalRemaining === 0) {
         if (isMatchmakingRoom) {
           // Les salons MATCH- sont éphémères : on les supprime
           // immédiatement (pas de reconnexion possible avec un code).
@@ -3994,11 +4302,24 @@ io.on('connection', async (socket) => {
           scheduleRoomCleanup(code);
         }
       } else {
-        if (wasHost) room.host = room.players[0];
+        if (wasHost) {
+          if (room.players.length > 0) {
+            room.host = room.players[0];
+          } else if (room.spectators.length > 0) {
+            const promoted = room.spectators.shift();
+            room.players.push(promoted);
+            if (room.lobby) {
+              const cfg = getFormatConfig(room.lobby.format);
+              room.lobby.slots[promoted] = (cfg.teams[0] || 'free');
+            }
+            room.host = promoted;
+          }
+        }
         io.to(code).emit('room-update', {
           playerCount: room.players.length,
           hostId: room.host
         });
+        broadcastLobbyState(code);
       }
       break;
     }

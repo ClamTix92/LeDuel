@@ -168,6 +168,12 @@ button {
   background: linear-gradient(180deg, rgba(37, 18, 79, .9), rgba(18, 6, 43, .92));
   border: 2px solid rgba(135, 57, 255, .45);
   box-shadow: inset 0 0 28px rgba(154, 71, 255, .22), 0 18px 42px rgba(0, 0, 0, .35);
+  /* backdrop-filter retiré ici : il créait un containing block 
+     qui piégeait les enfants en position: fixed */
+}
+
+/* On le remet uniquement sur l'éclair (lui n'a pas d'enfants fixed à piéger) */
+.top-energy-pill {
   backdrop-filter: blur(10px);
 }
 
@@ -1355,6 +1361,336 @@ body:not(.screen-home) .home-avatar-side {
   font-size: 15px;
   font-weight: 800;
 }
+
+/* ============================================================
+   LOBBY — wrapper flex (bloc central + panneau latéral joueurs)
+   ============================================================ */
+#lobby-container.lobby-screen-wrapper {
+  /* Outer flex container : pas de fond, pas de bordure (ils sont sur .lobby-main).
+     Pas de !important sur display : il faut que le `display:none` inline du JS
+     puisse encore cacher l'écran quand on est sur une autre vue. */
+  display: flex;
+  /* Largeur étendue pour pouvoir contenir : spacer + bloc + panneau = ~1784px.
+     Le bloc settings est centré grâce au spacer invisible à gauche (cf. ci-dessous). */
+  width: min(1784px, calc(100vw - 48px));
+  margin: 0 auto;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  position: relative;
+}
+
+/* Fantôme invisible à gauche, de même largeur que le panneau de droite.
+   Sert à équilibrer la flexbox : settings est ainsi mathématiquement centré
+   entre 2 zones de 280px (la spacer à gauche, le panel à droite). */
+.lobby-spacer-left {
+  flex: 0 0 280px;
+  height: 1px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Le bloc central garde le style "menu-box + lobby-screen" via ses classes,
+   on s'assure juste qu'il prend la largeur dont il a besoin et pas plus. */
+.lobby-main.lobby-screen {
+  flex: 0 1 1180px;
+  min-width: 0;
+  margin: 0;
+  position: relative;
+}
+
+/* Retire la 3e colonne désormais inutile (la carte joueurs a déménagé) */
+.lobby-topline {
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+}
+
+/* ============================================================
+   LOBBY — Panneau latéral des joueurs / spectateurs
+   ============================================================ */
+.lobby-players-panel {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: stretch;
+  /* Décalage vers le bas pour ne pas être caché par la barre Élo en haut à droite */
+  margin-top: 150px;
+  /* On évite que le panneau dépasse en hauteur */
+  max-height: calc(100vh - 130px);
+}
+
+/* Pilule sombre commune (X/Y Joueurs + Spectateurs) */
+.lobby-panel-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px 18px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(34, 11, 76, .92), rgba(17, 4, 44, .96));
+  border: 2px solid rgba(255, 255, 255, .08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .07),
+    0 6px 14px rgba(0, 0, 0, .35);
+  color: #fff;
+  text-align: center;
+}
+
+.lobby-panel-pill-text {
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: .3px;
+}
+
+.lobby-panel-pill-x {
+  color: #ffcf42;
+  text-shadow: 0 0 14px rgba(255, 207, 66, .55);
+}
+
+.lobby-panel-pill-yz {
+  color: #ffcf42;
+  text-shadow: 0 0 14px rgba(255, 207, 66, .55);
+}
+
+/* Zone qui contient les sections d'équipes ou la liste plate */
+.lobby-players-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.lobby-players-zone::-webkit-scrollbar { width: 8px; }
+.lobby-players-zone::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, .15);
+  border-radius: 99px;
+}
+
+/* En-tête d'une équipe (Équipe 1, Équipe 2) — même style que .lobby-panel-pill */
+.lobby-team-header {
+  /* hérite des règles de .lobby-panel-pill quand cette classe est aussi appliquée */
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffcf42;
+  text-shadow: 0 0 12px rgba(255, 207, 66, .45);
+  letter-spacing: .3px;
+}
+
+/* Container d'une équipe : la pilule "Équipe N" + ses chips */
+.lobby-team-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Chip pseudo joueur (violet plus clair, transparent) */
+.lobby-player-chip {
+  --chip-text-color: #ffffff;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(94, 38, 175, .42), rgba(60, 21, 122, .50));
+  border: 2px solid rgba(255, 255, 255, .07);
+  color: var(--chip-text-color);
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform .14s ease, filter .14s ease, box-shadow .14s ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .07),
+    0 4px 10px rgba(0, 0, 0, .25);
+}
+
+.lobby-player-chip:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.lobby-player-chip.is-dragging {
+  cursor: grabbing;
+  opacity: .55;
+  transform: scale(.97);
+}
+
+/* Joueur dont on n'a pas l'autorisation de bouger le pseudo */
+.lobby-player-chip[data-draggable="false"] {
+  cursor: default;
+}
+
+.lobby-player-chip[data-draggable="false"]:hover {
+  transform: none;
+  filter: none;
+}
+
+/* Adversaires (autres équipes, ou autres joueurs en 1v1v1/1v1) → rouge */
+.lobby-player-chip.is-opponent {
+  --chip-text-color: #ff4d6a;
+  text-shadow: 0 0 12px rgba(255, 60, 90, .35);
+}
+
+/* Couronne pour l'hôte du salon */
+.lobby-player-chip-crown {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 207, 66, .65));
+}
+
+.lobby-player-chip.has-crown {
+  padding-left: 36px;
+}
+
+/* Section spectateurs */
+.lobby-spectators-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Le bouton-pilule "Spectateurs ▼" reprend le style commun */
+.lobby-spectators-toggle {
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, .08);
+  width: 100%;
+}
+
+.lobby-spectators-toggle:hover {
+  filter: brightness(1.06);
+}
+
+.lobby-spectators-label {
+  color: #ffcf42;
+  text-shadow: 0 0 12px rgba(255, 207, 66, .45);
+}
+
+.lobby-spectators-count {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255, 255, 255, .08);
+  border-radius: 99px;
+  padding: 2px 10px;
+  line-height: 1.2;
+}
+
+.lobby-spectators-caret {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: #ffcf42;
+  margin-left: 4px;
+  transition: transform .18s ease;
+}
+
+.lobby-spectators-toggle[aria-expanded="true"] .lobby-spectators-caret {
+  transform: rotate(180deg);
+}
+
+/* Liste des spectateurs (pliable) */
+.lobby-spectators-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.lobby-spectators-list[hidden] { display: none; }
+
+.lobby-spectators-list::-webkit-scrollbar { width: 8px; }
+.lobby-spectators-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, .15);
+  border-radius: 99px;
+}
+
+/* Chip spectateur : pseudo en blanc italique légèrement transparent */
+.lobby-player-chip.is-spectator {
+  --chip-text-color: rgba(255, 255, 255, .68);
+  font-style: italic;
+  background: linear-gradient(180deg, rgba(72, 30, 130, .32), rgba(48, 16, 100, .42));
+}
+
+/* === Drag & drop : zone qui accepte un drop === */
+.lobby-drop-target {
+  outline: 2px dashed rgba(255, 207, 66, .55);
+  outline-offset: -4px;
+  background: rgba(255, 207, 66, .07);
+  border-radius: 18px;
+}
+
+/* Zone vide (équipe sans joueur) : on garde un encart visible pour pouvoir
+   y déposer un pseudo. */
+.lobby-team-block-empty .lobby-team-empty-hint {
+  font-style: italic;
+  color: rgba(255, 255, 255, .35);
+  text-align: center;
+  font-size: 13px;
+  padding: 8px;
+  border: 1px dashed rgba(255, 255, 255, .12);
+  border-radius: 14px;
+}
+
+/* Menu contextuel mobile (clic sur chip) */
+.lobby-action-menu {
+  position: fixed;
+  z-index: 9999;
+  background: linear-gradient(180deg, rgba(34, 11, 76, .98), rgba(17, 4, 44, .99));
+  border: 2px solid rgba(255, 255, 255, .12);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .5);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+}
+
+.lobby-action-menu button {
+  background: transparent;
+  border: 0;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lobby-action-menu button:hover {
+  background: rgba(255, 255, 255, .08);
+}
+
+.lobby-action-menu button:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
 
 .host-settings-card {
   padding: 26px;
@@ -2687,16 +3023,6 @@ body:not(.screen-home) .home-avatar-side {
     transform: scale(.82);
     transform-origin: left bottom;
   }
-
-  .top-player-pill {
-    transform: scale(.88);
-    transform-origin: right top;
-  }
-
-  .top-energy-pill {
-    transform: scale(.88);
-    transform-origin: left top;
-  }
 }
 
 @media (max-width: 1120px) {
@@ -2710,7 +3036,6 @@ body:not(.screen-home) .home-avatar-side {
   .top-energy-pill,
   .top-player-pill {
     position: absolute;
-    transform: scale(.72);
   }
 
   .screen-home-main {
@@ -2781,7 +3106,7 @@ body:not(.screen-home) .home-avatar-side {
   }
 
   .screen-home-main {
-    padding-top: 90px;
+    padding-top: 60px;
     padding-left: 14px;
     padding-right: 14px;
     padding-bottom: 24px;
@@ -3028,7 +3353,7 @@ body:not(.screen-home) .home-avatar-side {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
     margin-top: 0;
   }
 
@@ -3038,7 +3363,7 @@ body:not(.screen-home) .home-avatar-side {
     width: min(92vw, 430px);
     display: block;
 
-    margin: 0 auto 6px;
+    margin: 0 auto 1px;
 
     font-family: inherit;
     font-size: 1.35rem;
@@ -3267,49 +3592,175 @@ body:not(.screen-home) .home-avatar-side {
      LOBBY MOBILE — refonte compacte
      ============================================================ */
 
-  /* 1) Coller le bloc tout en haut sous le HUD */
-  #lobby-container.lobby-screen {
-    margin-top: 55px !important;
-    padding-top: 6px;
-    width: calc(100vw - 16px) !important;
-    margin-left: 8px !important;
-    margin-right: 8px !important;
-  }
+  /* ============================================================
+   LOBBY MOBILE — logo à gauche + infos compactes à droite
+   ============================================================ */
 
-  /* 2) Masquer le logo */
-  #lobby-container .match-header {
-    display: none;
-  }
+  @media (max-width: 720px) {
+    /* Wrapper extérieur : on autorise la mise en colonne (panneau joueurs sous le bloc central) */
+    #lobby-container.lobby-screen-wrapper {
+      flex-direction: column;
+      gap: 12px;
+      width: calc(100vw - 16px) !important;
+      padding: 0 !important;
+    }
 
-  #lobby-container .lobby-private-title {
-    width: 100%;
-    order: 1;
-    margin: 5px 0px 0px 70px;
-    text-align: center;
-    font-family: var(--font-title);
-    font-size: 1.95rem;
-    font-weight: 800;
-    color: #ffcf42;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    line-height: 1;
-    text-shadow:
-      0 0 14px rgba(255, 207, 66, 0.55),
-      0 4px 0 rgba(0, 0, 0, 0.35);
-  }
+    /* En mode colonne, le fantôme n'a plus de raison d'être */
+    .lobby-spacer-left {
+      display: none;
+    }
 
-  #lobby-container .lobby-code-block {
-    order: 2;
-    flex: 1 1 auto;
-    min-width: 0;
-  }
+    /* En mode colonne, pas besoin de décaler le panneau */
+    .lobby-players-panel {
+      margin-top: 0;
+    }
 
-  #lobby-container .player-count-card {
-    order: 3;
-  }
+    /* Bloc central : reprend les anciens overrides du lobby */
+    #lobby-container .lobby-main.lobby-screen {
+      margin-top: 55px !important;
+      padding-top: 6px;
+      width: 100% !important;
+      flex: 1 1 auto;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
 
-  #lobby-container #lobby-score-block {
-    order: 4;
+    /* Le btn-back vient du bloc central, on garde sa position */
+
+    #lobby-container>.match-header {
+      display: none;
+    }
+
+    #lobby-container .lobby-topline {
+      display: grid !important;
+      grid-template-columns: 116px minmax(0, 1fr) !important;
+      align-items: center;
+      gap: 8px;
+      min-height: 112px;
+      padding: 6px 8px 12px !important;
+      margin: 0 0 6px !important;
+      border-radius: 18px;
+    }
+
+    #lobby-container .lobby-topline::before {
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 22px;
+      border-radius: 18px 18px 0 0;
+    }
+
+    #lobby-container .lobby-logo-side {
+      justify-content: center;
+    }
+
+    #lobby-container .lobby-logo-img {
+      width: 116px;
+      max-height: 82px;
+    }
+
+    #lobby-container .lobby-info-side {
+      gap: 6px;
+      justify-items: center;
+    }
+
+    #lobby-container .lobby-private-title {
+      width: fit-content;
+      margin: 0;
+      padding: 4px 10px 5px;
+      font-size: 1.35rem;
+      letter-spacing: 0.3px;
+    }
+
+    #lobby-container .lobby-code-zone {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    #lobby-container .lobby-code-block {
+      padding: 7px 8px;
+    }
+
+    #lobby-container .lobby-code-row {
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    #lobby-container .lobby-topline h2 {
+      font-size: 1.05rem;
+      white-space: nowrap;
+    }
+
+    #lobby-container .copy-code-btn {
+      height: 34px;
+      padding: 0 9px;
+      font-size: 0.72rem;
+      border-radius: 11px;
+    }
+
+    #lobby-container .player-count-card {
+      min-width: 62px;
+      height: 42px;
+      border-radius: 13px;
+    }
+
+    #lobby-container .player-count-card span {
+      font-size: 22px;
+    }
+
+    #lobby-container .player-count-card small {
+      font-size: 10px;
+    }
+
+    #lobby-container #lobby-score-block {
+      transform: scale(0.78);
+      transform-origin: center;
+    }
+
+    /* === Panneau joueurs sur mobile : pleine largeur, plus compact === */
+    .lobby-players-panel {
+      flex: 1 1 auto;
+      width: 100%;
+      max-height: none;
+      margin-top: 8px;
+      padding: 0 8px;
+    }
+
+    .lobby-panel-pill {
+      min-height: 40px;
+      padding: 6px 12px;
+      border-radius: 14px;
+      border-width: 1.5px;
+    }
+
+    .lobby-panel-pill-text {
+      font-size: 16px;
+    }
+
+    .lobby-player-chip {
+      min-height: 38px;
+      font-size: 14px;
+      padding: 6px 10px;
+      border-radius: 12px;
+      border-width: 1.5px;
+    }
+
+    .lobby-player-chip.has-crown {
+      padding-left: 28px;
+    }
+
+    .lobby-player-chip-crown {
+      font-size: 14px;
+      left: 8px;
+    }
+
+    .lobby-spectators-count {
+      font-size: 12px;
+      padding: 2px 8px;
+    }
   }
 
   /* 4) "Code : XXXX" sur une seule ligne */
@@ -3448,6 +3899,128 @@ body:not(.screen-home) .home-avatar-side {
 .answers-toggle-btn:focus-visible {
   outline: 2px solid rgba(255, 207, 66, .7);
   outline-offset: 4px;
+}
+
+/* ==========================================================
+   MODE ARCADE — bouton on/off dans le header lobby
+   ========================================================== */
+.arcade-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: inherit;
+  transition: transform .16s ease, filter .16s ease;
+}
+
+.arcade-mode-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.arcade-toggle-switch {
+  position: relative;
+  width: 58px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, .14);
+  background: linear-gradient(180deg, rgba(54, 19, 100, .82), rgba(22, 6, 54, .9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .08),
+    inset 0 -2px 5px rgba(0, 0, 0, .35),
+    0 4px 10px rgba(0, 0, 0, .25);
+  transition: background .25s ease, border-color .25s ease, box-shadow .25s ease;
+}
+
+.arcade-toggle-thumb {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff, #d9d6ea);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, .45),
+    inset 0 1px 0 rgba(255, 255, 255, .9);
+  transform: translateY(-50%);
+  transition: left .25s cubic-bezier(.4, .0, .2, 1), background .25s ease;
+}
+
+.arcade-mode-toggle.is-on .arcade-toggle-switch {
+  background: linear-gradient(135deg, #ff9b16, #ff3f70 55%, #9b2dff);
+  border-color: rgba(255, 208, 68, .76);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .22),
+    0 0 16px rgba(255, 118, 34, .42),
+    0 6px 14px rgba(0, 0, 0, .28);
+}
+
+.arcade-mode-toggle.is-on .arcade-toggle-thumb {
+  left: calc(100% - 25px);
+  background: linear-gradient(180deg, #ffffff, #ffe6c0);
+}
+
+.arcade-toggle-label {
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, .55);
+  line-height: 1;
+  letter-spacing: .5px;
+  transition: color .2s ease, text-shadow .2s ease;
+}
+
+.arcade-mode-toggle.is-on .arcade-toggle-label {
+  color: #ffcf42;
+  text-shadow: 0 0 14px rgba(255, 207, 66, .45);
+}
+
+.arcade-mode-toggle:focus-visible {
+  outline: 2px solid rgba(255, 207, 66, .7);
+  outline-offset: 4px;
+}
+
+/* Désactivation pour les invités (cohérence avec les autres réglages) */
+.host-settings-card[data-role="guest"] .arcade-mode-toggle {
+  pointer-events: none;
+  opacity: .7;
+}
+
+/* ==========================================================
+   BLOC FORMAT — visible uniquement quand Mode Arcade est ON
+   ========================================================== */
+.arcade-format-block[hidden] {
+  display: none;
+}
+
+.arcade-format-block {
+  animation: arcade-format-fade-in .28s ease-out;
+}
+
+@keyframes arcade-format-fade-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.format-grid .choice-btn {
+  min-width: 130px;
+}
+
+/* Les emplacements en attente : un petit indice visuel discret,
+   mais ils restent cliquables et stylés comme les autres */
+.format-choice.format-placeholder {
+  opacity: .58;
+  font-style: italic;
+}
+
+.format-choice.format-placeholder.active-choice {
+  opacity: 1;
+  font-style: normal;
 }
 
 /* ==========================================================
@@ -4196,6 +4769,49 @@ footer a:hover {
   .host-settings-header {
     margin: 0 0 4px;
     gap: 6px;
+  }
+
+  /* Toggle Mode Arcade : compact sur mobile, reste visible */
+  .arcade-mode-toggle {
+    padding: 4px 6px;
+    gap: 8px;
+  }
+
+  .arcade-toggle-switch {
+    width: 46px;
+    height: 24px;
+    border-width: 1.5px;
+  }
+
+  .arcade-toggle-thumb {
+    width: 17px;
+    height: 17px;
+    left: 2px;
+  }
+
+  .arcade-mode-toggle.is-on .arcade-toggle-thumb {
+    left: calc(100% - 20px);
+  }
+
+  .arcade-toggle-label {
+    font-size: 13px;
+    letter-spacing: .3px;
+  }
+
+  /* Bloc Format : grille 2 colonnes sur mobile pour ne pas déborder */
+  .arcade-format-block {
+    margin-top: 12px;
+  }
+
+  .format-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    width: 100%;
+  }
+
+  .format-grid .choice-btn {
+    min-width: 0;
   }
 
   .host-settings-card h3 {
@@ -5131,5 +5747,415 @@ footer a:hover {
 
   .sheet-join-line {
     grid-template-columns: 1fr 96px;
+  }
+}
+
+/* =========================================================
+   FIX HEADER DESKTOP : 2 pilules séparées (gauche / droite)
+   Gauche  : [profil + pseudo + niveau]  [⚡ 15]
+   Droite  : [élo images] [élo quiz] [⚙️]
+   ========================================================= */
+@media (min-width: 721px) {
+
+  /* ========== PILULE GAUCHE : profil ========== */
+  #btn-profile-settings.top-player-identity {
+    position: fixed;
+    top: 36px;
+    left: 38px;
+    z-index: 40;
+
+    width: 280px;
+    height: 74px;
+
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 18px;
+
+    border-radius: 25px;
+    background: linear-gradient(180deg, rgba(37, 18, 79, .9), rgba(18, 6, 43, .92));
+    border: 2px solid rgba(135, 57, 255, .45);
+    box-shadow: inset 0 0 28px rgba(154, 71, 255, .22),
+      0 18px 42px rgba(0, 0, 0, .35);
+    backdrop-filter: blur(10px);
+
+    cursor: pointer;
+    overflow: visible;
+    place-items: unset;
+    /* annule le grid place-items: center hérité */
+    transition: transform .22s ease, filter .22s ease;
+  }
+
+  #btn-profile-settings.top-player-identity:hover {
+    transform: scale(1.02);
+    filter: brightness(1.12);
+  }
+
+  #btn-profile-settings.top-player-identity:active {
+    transform: scale(.98);
+  }
+
+  /* Layout du texte profil : pseudo ligne 1, [barre | numéro] ligne 2 */
+  .top-player-text {
+    display: grid;
+    grid-template-areas:
+      "pseudo pseudo"
+      "bar    level";
+    grid-template-columns: 1fr auto;
+    column-gap: 8px;
+    row-gap: 5px;
+    align-items: center;
+  }
+
+  .top-player-text strong {
+    grid-area: pseudo;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #fff;
+  }
+
+  .top-player-text i {
+    grid-area: bar;
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .top-player-text span {
+    grid-area: level;
+    display: block;
+    color: #ffc033;
+    font-weight: 800;
+    font-size: 15px;
+    line-height: 1;
+    margin-top: 0;
+  }
+
+  /* ========== PILULE ⚡15 : juste à droite du profil ========== */
+  .top-energy-pill {
+    left: 332px;
+    /* 38 (profil) + 280 (largeur profil) + 14 (gap) */
+    width: auto;
+    min-width: 130px;
+    padding: 0 24px;
+    gap: 12px;
+  }
+
+  /* ========== PILULE DROITE : élos + engrenage ========== */
+  .top-player-pill {
+    width: auto;
+    min-width: 260px;
+    display: flex;
+    /* à la place du grid à 3 colonnes */
+    align-items: center;
+    gap: 18px;
+    padding: 0 22px;
+    grid-template-columns: unset;
+    /* annule l'ancien grid */
+  }
+
+  /* Élos sur desktop (n'avaient aucun style desktop avant) */
+  #elo-images,
+  #elo-quiz {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-title);
+    font-weight: 800;
+    font-size: 24px;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, .35);
+    white-space: nowrap;
+  }
+
+  #elo-images::before,
+  #elo-quiz::before {
+    content: "🏆";
+    font-size: 26px;
+    line-height: 1;
+  }
+
+  #elo-quiz::before {
+    filter: hue-rotate(40deg) saturate(1.2);
+  }
+
+  /* Engrenage / connexion sur desktop */
+  #btn-auth-gear {
+    width: 50px;
+    height: 50px;
+    margin-left: 6px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(40, 15, 80, .65);
+    border: 2px solid rgba(168, 68, 255, .55);
+    border-radius: 50%;
+    cursor: pointer;
+
+    transition: filter .2s ease, transform .2s ease;
+  }
+
+  #btn-auth-gear:hover {
+    filter: brightness(1.18);
+    transform: rotate(18deg);
+  }
+
+  #btn-auth-gear:active {
+    transform: scale(.94);
+  }
+
+  #btn-auth-gear .profile-settings-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* ==========================================================
+   PATCH LOBBY — Logo à gauche + infos salon à droite
+   ========================================================== */
+
+  #lobby-container .lobby-main.lobby-screen {
+    padding-top: 22px;
+  }
+
+  /* Sécurité : si l'ancien match-header est encore dans le HTML, on le masque uniquement dans le lobby */
+  #lobby-container>.match-header {
+    display: none;
+  }
+
+  #lobby-container .lobby-topline {
+    position: relative;
+    display: grid !important;
+    grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.15fr) !important;
+    align-items: center;
+    gap: clamp(18px, 3vw, 36px);
+    min-height: 170px;
+    padding: 12px 34px 20px;
+    margin: 0 0 12px !important;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+  }
+
+  /* Socle sombre sous le bloc, pour retrouver l'effet de ta maquette */
+  #lobby-container .lobby-topline::before {
+    content: "";
+    position: absolute;
+    left: 2%;
+    right: 2%;
+    bottom: 0;
+    height: 34px;
+    z-index: 0;
+    border-radius: 26px 26px 0 0;
+    background: linear-gradient(180deg,
+        rgba(44, 19, 78, 0.92),
+        rgba(18, 6, 43, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    clip-path: polygon(2% 45%,
+        4% 0,
+        36% 0,
+        36% 42%,
+        64% 42%,
+        64% 0,
+        96% 0,
+        98% 45%,
+        100% 100%,
+        0 100%);
+  }
+
+  #lobby-container .lobby-logo-side {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #lobby-container .lobby-logo-img {
+    width: clamp(250px, 29vw, 370px);
+    max-height: 145px;
+    object-fit: contain;
+    display: block;
+    filter:
+      drop-shadow(0 0 20px rgba(177, 61, 255, 0.68)) drop-shadow(0 10px 0 rgba(45, 8, 84, 0.45));
+  }
+
+  #lobby-container .lobby-info-side {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 12px;
+  }
+
+  #lobby-container .lobby-private-title {
+    grid-column: auto;
+    justify-self: center;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0;
+    padding: 9px 24px 10px;
+    border-radius: 0;
+    background: rgba(24, 8, 51, 0.72);
+    font-family: var(--font-title);
+    font-size: clamp(34px, 4vw, 46px);
+    font-weight: 800;
+    color: #ffcf42;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    line-height: 1;
+    text-align: center;
+    text-shadow:
+      0 0 18px rgba(255, 207, 66, 0.55),
+      0 5px 0 rgba(0, 0, 0, 0.35);
+  }
+
+  #lobby-container .lobby-code-zone {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  #lobby-container .lobby-code-block {
+    min-width: 0;
+    justify-self: auto;
+    padding: 12px 18px;
+    border-radius: 0;
+    background: rgba(24, 8, 51, 0.78);
+  }
+
+  #lobby-container .lobby-code-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: nowrap;
+  }
+
+  #lobby-container .lobby-topline h2 {
+    margin: 0;
+    font-size: clamp(30px, 3.5vw, 42px);
+    font-family: var(--font-title);
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  #lobby-container .copy-code-btn {
+    height: 50px;
+    padding: 0 20px;
+    border-radius: 16px;
+    font-size: 15px;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, #bb34ff, #7220d2);
+  }
+
+  #lobby-container .player-count-card {
+    grid-column: auto !important;
+    justify-self: auto;
+    flex-shrink: 0;
+    min-width: 126px;
+    height: 74px;
+    border-radius: 22px;
+    background: rgba(7, 0, 24, 0.58);
+    display: grid;
+    place-items: center;
+    text-align: center;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+  }
+
+  #lobby-container .player-count-card span {
+    display: block;
+    color: #ffcf42;
+    font-family: var(--font-title);
+    font-size: 34px;
+    line-height: 0.8;
+  }
+
+  #lobby-container .player-count-card small {
+    display: block;
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  #lobby-container #lobby-score-block {
+    position: static;
+    justify-self: auto;
+    align-self: center;
+    min-width: 130px;
+  }
+
+  /* On rapproche légèrement le bloc paramètres du nouveau header compact */
+  #lobby-container .host-settings-card {
+    margin-top: 4px;
+  }
+
+  /* ==========================================================
+   CORRECTION LOBBY — retour au background transparent d'origine
+   ========================================================== */
+
+  /* Bloc global : on reprend le style de l'ancien bloc Salon Privé / Code */
+  #lobby-container .lobby-topline {
+    background: rgba(255, 255, 255, .06) !important;
+    border: 2px solid rgba(255, 255, 255, .08) !important;
+    border-radius: 28px !important;
+    box-shadow: none !important;
+    overflow: hidden;
+  }
+
+  /* On supprime le socle décoratif ajouté dans le précédent patch */
+  #lobby-container .lobby-topline::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  /* Le titre ne doit plus avoir son propre rectangle */
+  #lobby-container .lobby-private-title {
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* Le code ne doit plus avoir son propre rectangle non plus */
+  #lobby-container .lobby-code-block {
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* On garde seulement la carte du nombre de joueurs, comme avant */
+  #lobby-container .player-count-card {
+    background: rgba(7, 0, 24, .52) !important;
+    border: 2px solid rgba(255, 255, 255, .1) !important;
+  }
+
+  @media (max-width: 720px) {
+    #lobby-container .lobby-topline {
+      background: rgba(255, 255, 255, .06) !important;
+      border: 2px solid rgba(255, 255, 255, .08) !important;
+      border-radius: 20px !important;
+      overflow: hidden;
+    }
+
+    #lobby-container .lobby-topline::before {
+      display: none !important;
+      content: none !important;
+    }
+
+    #lobby-container .lobby-private-title,
+    #lobby-container .lobby-code-block {
+      background: transparent !important;
+      padding: 0 !important;
+    }
   }
 }

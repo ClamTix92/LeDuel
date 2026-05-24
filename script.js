@@ -698,13 +698,18 @@ function broadcastLobbySettings() {
   const themeBtn = document.querySelector('#theme-choice-group .choice-btn.active-choice');
   const timerBtn = document.querySelector('#timer-choice-group .choice-btn.active-choice');
   const roundsBtn = document.querySelector('#rounds-choice-group .choice-btn.active-choice');
+  const arcadeBtn = document.getElementById('btn-arcade-mode');
+  const formatBtn = document.querySelector('#format-choice-group .choice-btn.active-choice');
+  const arcadeOn = arcadeBtn && arcadeBtn.classList.contains('is-on');
 
   socket.emit('lobby-settings-update', {
     code: myRoomCode,
     mode: modeBtn ? modeBtn.dataset.mode : null,
     theme: themeBtn ? themeBtn.dataset.theme : null,
     timer: timerBtn ? parseInt(timerBtn.dataset.timer, 10) : null,
-    rounds: roundsBtn ? parseInt(roundsBtn.dataset.rounds, 10) : null
+    rounds: roundsBtn ? parseInt(roundsBtn.dataset.rounds, 10) : null,
+    arcadeMode: !!arcadeOn,
+    format: arcadeOn && formatBtn ? formatBtn.dataset.format : '1v1'
   });
 }
 
@@ -744,6 +749,46 @@ document.getElementById('rounds-choice-group').addEventListener('click', e => {
   if (document.getElementById('rounds-choice-group').classList.contains('locked')) return;
   setActiveChoice('#rounds-choice-group', btn);
   syncStartButton();
+  broadcastLobbySettings();
+});
+
+/* ================================================================
+   MODE ARCADE — toggle on/off + sélection du format
+   ----------------------------------------------------------------
+   Pour l'instant, le format choisi n'est pas envoyé au serveur :
+   la logique réseau pourra être ajoutée plus tard, quand chaque
+   format aura ses propres règles. On gère ici uniquement l'UI.
+   ================================================================ */
+const arcadeToggleBtn  = document.getElementById('btn-arcade-mode');
+const arcadeFormatBlock = document.getElementById('arcade-format-block');
+const formatChoiceGroup = document.getElementById('format-choice-group');
+
+function setArcadeMode(isOn) {
+  arcadeToggleBtn.classList.toggle('is-on', isOn);
+  arcadeToggleBtn.setAttribute('aria-checked', isOn ? 'true' : 'false');
+  arcadeFormatBlock.hidden = !isOn;
+
+  // Si on rallume le mode arcade, on s'assure qu'un format reste sélectionné.
+  if (isOn) {
+    const anyActive = formatChoiceGroup.querySelector('.choice-btn.active-choice');
+    if (!anyActive) {
+      const first = formatChoiceGroup.querySelector('.choice-btn');
+      if (first) first.classList.add('active-choice');
+    }
+  }
+}
+
+arcadeToggleBtn.addEventListener('click', () => {
+  if (document.getElementById('host-settings').dataset.role === 'guest') return;
+  setArcadeMode(!arcadeToggleBtn.classList.contains('is-on'));
+  broadcastLobbySettings();
+});
+
+formatChoiceGroup.addEventListener('click', e => {
+  const btn = e.target.closest('.choice-btn');
+  if (!btn) return;
+  if (document.getElementById('host-settings').dataset.role === 'guest') return;
+  setActiveChoice('#format-choice-group', btn);
   broadcastLobbySettings();
 });
 
@@ -817,7 +862,7 @@ socket.on('room-created', payload => {
   }
   document.getElementById('mode-select-container').style.display = 'none';
   document.getElementById('home-container').style.display = 'none';
-  document.getElementById('lobby-container').style.display = 'block';
+  document.getElementById('lobby-container').style.display = 'flex';
   setActiveScreen('lobby');
   document.getElementById('display-room-code').innerText = code;
   document.getElementById('host-settings').style.display = 'block';
@@ -874,7 +919,7 @@ socket.on('room-joined', payload => {
   closePrivateRoomSheet();
   document.getElementById('mode-select-container').style.display = 'none';
   document.getElementById('home-container').style.display = 'none';
-  document.getElementById('lobby-container').style.display = 'block';
+  document.getElementById('lobby-container').style.display = 'flex';
   setActiveScreen('lobby');
   document.getElementById('display-room-code').innerText = code;
   // L'invité voit les paramètres du salon comme l'hôte, mais en lecture seule.
@@ -884,10 +929,19 @@ socket.on('room-joined', payload => {
   if (guestNote) guestNote.style.display = 'block';
 });
 
+// Compteur de joueurs actifs maintenu en mémoire (l'élément DOM `room-player-count`
+// a été supprimé : l'info vit désormais dans le panneau latéral). Cette valeur
+// est utilisée par syncStartButton() et autres checks "au moins 2 joueurs".
+let activePlayerCount = 1;
+
 socket.on('room-update', payload => {
   const playerCount = payload && payload.playerCount;
   const hostId = payload && payload.hostId;
-  document.getElementById('room-player-count').innerText = playerCount;
+  if (typeof playerCount === 'number') activePlayerCount = playerCount;
+  // Compat : si jamais l'ancien élément est encore présent dans le DOM
+  // (vieux templates en cache), on continue à le mettre à jour.
+  const legacyCountEl = document.getElementById('room-player-count');
+  if (legacyCountEl) legacyCountEl.innerText = playerCount;
 
   // Si le serveur indique qui est l'hôte et que c'est nous, basculer l'UI
   // en mode hôte (par exemple si l'hôte précédent vient de quitter).
@@ -947,6 +1001,387 @@ socket.on('lobby-settings-update', payload => {
     const roundsBtn = document.querySelector(`#rounds-choice-group .choice-btn[data-rounds="${payload.rounds}"]`);
     if (roundsBtn) setActiveChoice('#rounds-choice-group', roundsBtn);
   }
+  // Mode arcade : on/off
+  if (typeof payload.arcadeMode === 'boolean') {
+    setArcadeMode(payload.arcadeMode);
+  }
+  // Format actif (visible uniquement quand l'arcade est on)
+  if (payload.format) {
+    const formatBtn = document.querySelector(`#format-choice-group .choice-btn[data-format="${payload.format}"]`);
+    if (formatBtn) setActiveChoice('#format-choice-group', formatBtn);
+  }
+});
+
+/* ================================================================
+   PANNEAU DES JOUEURS (Salon Privé) — sidebar de droite
+   ----------------------------------------------------------------
+   Le serveur émet `lobby-state` à chaque changement (arrivée, départ,
+   déplacement, changement de format). Le client redessine le panneau
+   à partir de cet état et offre 2 façons de déplacer son pseudo :
+     • Drag & drop (desktop)
+     • Clic sur le pseudo → menu contextuel (fallback mobile/tactile)
+   ================================================================ */
+
+// Miroir de la config serveur. À synchroniser si tu ajoutes/change un format.
+const LOBBY_FORMAT_CONFIG = {
+  '1v1':     { teams: ['free'],          showTeamHeaders: false },
+  '1v1v1':   { teams: ['free'],          showTeamHeaders: false },
+  '1v2':     { teams: ['team1', 'team2'], showTeamHeaders: true  },
+  'format4': { teams: ['free'],          showTeamHeaders: false },
+  'format5': { teams: ['free'],          showTeamHeaders: false },
+  'format6': { teams: ['free'],          showTeamHeaders: false },
+  'format7': { teams: ['free'],          showTeamHeaders: false },
+  'format8': { teams: ['free'],          showTeamHeaders: false }
+};
+
+// État reçu du serveur (initialisé vide).
+let lobbyState = {
+  members: [],
+  format: '1v1',
+  arcadeMode: false,
+  maxActivePlayers: 2,
+  maxSpectators: 10,
+  hostId: null
+};
+
+// Renvoie la config (avec fallback sur 1v1 si format inconnu).
+function getLobbyFormatConfig(format) {
+  return LOBBY_FORMAT_CONFIG[format] || LOBBY_FORMAT_CONFIG['1v1'];
+}
+
+// Renvoie le slot du joueur actif courant (utile pour colorer rouge/blanc).
+function getMySlot() {
+  const me = lobbyState.members.find(m => m.socketId === socket.id);
+  return me ? me.slot : null;
+}
+
+// Construit un chip <div> pour un membre.
+function buildPlayerChip(member, isOpponent, canMove) {
+  const chip = document.createElement('div');
+  chip.className = 'lobby-player-chip';
+  chip.dataset.memberId = member.socketId;
+  chip.dataset.draggable = canMove ? 'true' : 'false';
+  if (member.isHost) chip.classList.add('has-crown');
+  if (isOpponent) chip.classList.add('is-opponent');
+  if (member.slot === 'spectator') chip.classList.add('is-spectator');
+
+  if (member.isHost) {
+    const crown = document.createElement('span');
+    crown.className = 'lobby-player-chip-crown';
+    crown.textContent = '👑';
+    crown.setAttribute('aria-label', 'Hôte du salon');
+    chip.appendChild(crown);
+  }
+
+  const name = document.createElement('span');
+  name.className = 'lobby-player-chip-name';
+  name.textContent = member.nickname || 'Joueur';
+  chip.appendChild(name);
+
+  if (canMove) {
+    chip.setAttribute('draggable', 'true');
+    chip.title = 'Glisse pour changer d\'équipe ou clique pour ouvrir le menu';
+  }
+  return chip;
+}
+
+// Détermine si le joueur courant peut déplacer ce membre.
+//   • Soi-même : toujours.
+//   • Hôte : peut déplacer n'importe qui.
+function canMoveMember(memberId) {
+  if (memberId === socket.id) return true;
+  return lobbyState.hostId === socket.id;
+}
+
+// (Re)construit l'intégralité du panneau à partir de lobbyState.
+function renderLobbyPanel() {
+  const headerCountEl = document.getElementById('lobby-active-count');
+  const headerMaxEl   = document.getElementById('lobby-active-max');
+  const playersZone   = document.getElementById('lobby-players-zone');
+  const specToggle    = document.getElementById('lobby-spectators-toggle');
+  const specCountEl   = document.getElementById('lobby-spectators-count');
+  const specList      = document.getElementById('lobby-spectators-list');
+
+  if (!playersZone || !specList) return;
+
+  // 1) Découpage membres : actifs vs spectateurs.
+  const active     = lobbyState.members.filter(m => m.slot !== 'spectator');
+  const spectators = lobbyState.members.filter(m => m.slot === 'spectator');
+
+  // 2) En-tête X/Y
+  headerCountEl.textContent = active.length;
+  headerMaxEl.textContent = `/${lobbyState.maxActivePlayers} Joueurs`;
+
+  // 3) Compteur spectateurs
+  specCountEl.textContent = `${spectators.length}/${lobbyState.maxSpectators}`;
+
+  // 4) Zone des actifs
+  playersZone.innerHTML = '';
+  const cfg = getLobbyFormatConfig(lobbyState.format);
+  const mySlot = getMySlot();
+
+  // Pour la coloration (mes coéquipiers / adversaires)
+  // - 1v2 (équipes) : mêmes membres de mon équipe = blanc, autre équipe = rouge
+  // - autres formats : tous les autres = rouge, moi = blanc
+  const isOpponentOf = (member) => {
+    if (member.socketId === socket.id) return false;
+    if (cfg.teams.length === 2 && mySlot && mySlot !== 'spectator') {
+      return member.slot !== mySlot;
+    }
+    return true;
+  };
+
+  if (cfg.showTeamHeaders) {
+    // Format en équipes : on construit une section par équipe.
+    // En mode équipes, la zone joueurs n'est plus un drop-target global :
+    // seules les sections d'équipe le sont, pour cibler précisément 1 ou 2.
+    delete playersZone.dataset.slot;
+
+    // On met l'équipe du joueur courant en premier (s'il est actif).
+    const order = cfg.teams.slice();
+    if (mySlot && order.includes(mySlot)) {
+      order.sort((a, b) => (a === mySlot ? -1 : (b === mySlot ? 1 : 0)));
+    }
+    // Mais on garde les labels "Équipe 1"/"Équipe 2" attachés au slot d'origine.
+    order.forEach(teamSlot => {
+      const block = document.createElement('div');
+      block.className = 'lobby-team-block';
+      // Tout le bloc d'équipe sert de drop-target (header + chips + empty hint)
+      block.dataset.slot = `dropzone-${teamSlot}`;
+
+      // En-tête équipe (style pilule sombre + texte jaune)
+      const header = document.createElement('div');
+      header.className = 'lobby-panel-pill lobby-team-header';
+      const labelIdx = cfg.teams.indexOf(teamSlot) + 1;
+      header.textContent = `Équipe ${labelIdx}`;
+      block.appendChild(header);
+
+      // Membres de l'équipe (moi en premier si je suis dans cette équipe)
+      const teamMembers = active.filter(m => m.slot === teamSlot);
+      teamMembers.sort((a, b) => {
+        if (a.socketId === socket.id) return -1;
+        if (b.socketId === socket.id) return 1;
+        return 0;
+      });
+
+      if (teamMembers.length === 0) {
+        const hint = document.createElement('div');
+        hint.className = 'lobby-team-empty-hint';
+        hint.textContent = '(vide)';
+        block.appendChild(hint);
+        block.classList.add('lobby-team-block-empty');
+      } else {
+        teamMembers.forEach(m => {
+          block.appendChild(buildPlayerChip(m, isOpponentOf(m), canMoveMember(m.socketId)));
+        });
+      }
+      playersZone.appendChild(block);
+    });
+  } else {
+    // Format à liste plate (1v1, 1v1v1, …) : pas de label d'équipe.
+    // La zone entière devient un drop-target pour revenir actif.
+    playersZone.dataset.slot = `dropzone-${cfg.teams[0]}`;
+
+    // Mon pseudo en premier, puis les autres.
+    const sorted = active.slice().sort((a, b) => {
+      if (a.socketId === socket.id) return -1;
+      if (b.socketId === socket.id) return 1;
+      return 0;
+    });
+    sorted.forEach(m => {
+      playersZone.appendChild(buildPlayerChip(m, isOpponentOf(m), canMoveMember(m.socketId)));
+    });
+  }
+
+  // 5) Liste spectateurs
+  specList.innerHTML = '';
+  spectators.forEach(m => {
+    specList.appendChild(buildPlayerChip(m, false, canMoveMember(m.socketId)));
+  });
+
+  // 6) Sync du bouton "LANCER LE DUEL" — en 1v1 il faut 2 joueurs actifs
+  const startBtn = document.getElementById('btn-start-custom');
+  if (startBtn && lobbyState.format === '1v1') {
+    startBtn.disabled = active.length < 2;
+  }
+}
+
+// === Spectateurs : repli/déploiement ===
+const spectatorsToggleEl = document.getElementById('lobby-spectators-toggle');
+if (spectatorsToggleEl) {
+  spectatorsToggleEl.addEventListener('click', (e) => {
+    // Si le clic provient d'un chip enfant, on ne déplie pas.
+    if (e.target.closest('.lobby-player-chip')) return;
+    const expanded = spectatorsToggleEl.getAttribute('aria-expanded') === 'true';
+    spectatorsToggleEl.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    const list = document.getElementById('lobby-spectators-list');
+    if (list) list.hidden = expanded;
+  });
+}
+
+// === Drag & drop ===
+let dragSourceMemberId = null;
+
+function getDropTargetSlot(el) {
+  if (!el) return null;
+  const targetEl = el.closest('[data-slot]');
+  if (!targetEl) return null;
+  const ds = targetEl.dataset.slot;
+  if (!ds) return null;
+  // Les zones de drop sont préfixées "dropzone-" pour éviter les ambiguïtés
+  if (ds.startsWith('dropzone-')) return ds.replace('dropzone-', '');
+  return null;
+}
+
+function sendMemberMove(memberId, targetSlot) {
+  if (!myRoomCode || !memberId || !targetSlot) return;
+  socket.emit('lobby-member-move', {
+    code: myRoomCode,
+    memberId,
+    targetSlot
+  });
+}
+
+const lobbyPanel = document.getElementById('lobby-players-panel');
+if (lobbyPanel) {
+  // dragstart : on mémorise quel membre est en train d'être déplacé.
+  lobbyPanel.addEventListener('dragstart', (e) => {
+    const chip = e.target.closest('.lobby-player-chip');
+    if (!chip || chip.dataset.draggable !== 'true') {
+      e.preventDefault();
+      return;
+    }
+    dragSourceMemberId = chip.dataset.memberId;
+    chip.classList.add('is-dragging');
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', dragSourceMemberId); } catch (err) { /* IE */ }
+    }
+  });
+
+  lobbyPanel.addEventListener('dragend', (e) => {
+    const chip = e.target.closest('.lobby-player-chip');
+    if (chip) chip.classList.remove('is-dragging');
+    dragSourceMemberId = null;
+    lobbyPanel.querySelectorAll('.lobby-drop-target').forEach(el => el.classList.remove('lobby-drop-target'));
+  });
+
+  lobbyPanel.addEventListener('dragover', (e) => {
+    if (!dragSourceMemberId) return;
+    const slot = getDropTargetSlot(e.target);
+    if (!slot) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    // Surligner la zone visée
+    lobbyPanel.querySelectorAll('.lobby-drop-target').forEach(el => el.classList.remove('lobby-drop-target'));
+    const targetEl = e.target.closest('[data-slot]');
+    if (targetEl) targetEl.classList.add('lobby-drop-target');
+  });
+
+  lobbyPanel.addEventListener('dragleave', (e) => {
+    // On enlève le surlignage si on quitte vraiment la zone.
+    const targetEl = e.target.closest('[data-slot]');
+    if (targetEl && !targetEl.contains(e.relatedTarget)) {
+      targetEl.classList.remove('lobby-drop-target');
+    }
+  });
+
+  lobbyPanel.addEventListener('drop', (e) => {
+    const slot = getDropTargetSlot(e.target);
+    if (!slot || !dragSourceMemberId) return;
+    e.preventDefault();
+    sendMemberMove(dragSourceMemberId, slot);
+    lobbyPanel.querySelectorAll('.lobby-drop-target').forEach(el => el.classList.remove('lobby-drop-target'));
+    dragSourceMemberId = null;
+  });
+}
+
+// === Fallback clic (tactile / accessibilité) : ouvre un petit menu ===
+let lobbyActionMenuEl = null;
+
+function closeLobbyActionMenu() {
+  if (lobbyActionMenuEl) {
+    lobbyActionMenuEl.remove();
+    lobbyActionMenuEl = null;
+    document.removeEventListener('click', onDocClickCloseMenu, true);
+  }
+}
+
+function onDocClickCloseMenu(e) {
+  if (lobbyActionMenuEl && !lobbyActionMenuEl.contains(e.target)) closeLobbyActionMenu();
+}
+
+function openLobbyActionMenu(chip) {
+  closeLobbyActionMenu();
+  const memberId = chip.dataset.memberId;
+  if (!memberId) return;
+  const member = lobbyState.members.find(m => m.socketId === memberId);
+  if (!member) return;
+
+  const cfg = getLobbyFormatConfig(lobbyState.format);
+  const menu = document.createElement('div');
+  menu.className = 'lobby-action-menu';
+
+  const buildBtn = (label, targetSlot) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.disabled = (member.slot === targetSlot);
+    b.addEventListener('click', () => {
+      sendMemberMove(memberId, targetSlot);
+      closeLobbyActionMenu();
+    });
+    return b;
+  };
+
+  if (cfg.showTeamHeaders) {
+    cfg.teams.forEach((slot, i) => menu.appendChild(buildBtn(`Rejoindre Équipe ${i + 1}`, slot)));
+  } else {
+    // Liste plate : la seule action utile est passer/quitter spectateur,
+    // donc on n'ajoute pas de bouton "Rejoindre les joueurs" si déjà actif.
+    if (member.slot === 'spectator') {
+      menu.appendChild(buildBtn('Rejoindre les joueurs', cfg.teams[0]));
+    }
+  }
+  menu.appendChild(buildBtn('Devenir spectateur', 'spectator'));
+
+  // Position : juste sous le chip
+  const rect = chip.getBoundingClientRect();
+  document.body.appendChild(menu);
+  // On positionne après ajout pour pouvoir lire menu.offsetWidth si besoin
+  const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 10);
+  menu.style.left = Math.max(10, left) + 'px';
+  menu.style.top = (rect.bottom + 6) + 'px';
+
+  lobbyActionMenuEl = menu;
+  // Petit délai pour éviter que le clic d'ouverture ne soit attrapé par le close.
+  setTimeout(() => document.addEventListener('click', onDocClickCloseMenu, true), 0);
+}
+
+if (lobbyPanel) {
+  lobbyPanel.addEventListener('click', (e) => {
+    const chip = e.target.closest('.lobby-player-chip');
+    if (!chip) return;
+    // Sur le bouton de repli des spectateurs, ne pas réagir
+    if (e.target.closest('#lobby-spectators-toggle') && !chip) return;
+    if (chip.dataset.draggable !== 'true') return;
+    e.stopPropagation();
+    openLobbyActionMenu(chip);
+  });
+}
+
+// === Réception de l'état du salon depuis le serveur ===
+socket.on('lobby-state', payload => {
+  if (!payload) return;
+  lobbyState = {
+    members: Array.isArray(payload.members) ? payload.members : [],
+    format: payload.format || '1v1',
+    arcadeMode: !!payload.arcadeMode,
+    maxActivePlayers: payload.maxActivePlayers || 2,
+    maxSpectators: payload.maxSpectators || 10,
+    hostId: payload.hostId || null
+  };
+  renderLobbyPanel();
 });
 
 socket.on('error-message', msg => {
@@ -1480,9 +1915,7 @@ function updateLobbyMatchStatus(options = {}) {
     // Texte mis à jour même si on est seul, pour rester en phase avec l'état
     // du match. Le bouton ne devient cliquable qu'avec 2 joueurs présents :
     // sinon start-game côté serveur s'appuierait sur room.players[1] absent.
-    const playerCountEl = document.getElementById('room-player-count');
-    const playerCount = playerCountEl ? (parseInt(playerCountEl.innerText, 10) || 1) : 1;
-    startBtn.disabled = playerCount < 2;
+    startBtn.disabled = activePlayerCount < 2;
     startBtn.innerText = `LANCER LA MANCHE ${nextRound}`;
   }
 }
@@ -1720,7 +2153,7 @@ function resetGameUI(keepMatchState = false) {
 
 // Helper : ramener l'UI à l'état "lobby de salon privé" en respectant le rôle.
 function returnToLobbyUI() {
-  document.getElementById('lobby-container').style.display = 'block';
+  document.getElementById('lobby-container').style.display = 'flex';
   setActiveScreen('lobby');
 
   const hostSettings = document.getElementById('host-settings');
@@ -1952,7 +2385,7 @@ btnShowAnswers?.addEventListener('click', () => {
 
 btnBackAnswers?.addEventListener('click', () => {
   hideAnswersScreen();
-  document.getElementById('lobby-container').style.display = 'block';
+  document.getElementById('lobby-container').style.display = 'flex';
   setActiveScreen('lobby');
 });
 
