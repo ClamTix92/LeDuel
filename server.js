@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const { pool, initDB } = require('./db');
+const { computeMatchXp, levelFromXp } = require('./xp_engine');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { v4: uuidv4 } = require('uuid');
@@ -32,7 +33,7 @@ app.use(helmet({
 // Général : 100 requêtes par 15 min par IP (pour toutes les routes)
 app.use(rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 5000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Trop de requêtes, réessaie dans quelques minutes.' }
@@ -162,7 +163,7 @@ app.get('/api/me', async (req, res) => {
   if (!req.session.userId) return res.json(null);
   try {
     const result = await pool.query(
-      'SELECT id, username, avatar_url, google_id, email, elo_quiz, elo_images, games_quiz, games_images FROM users WHERE id = $1',
+      'SELECT id, username, avatar_url, google_id, email, elo_quiz, elo_images, games_quiz, games_images, xp FROM users WHERE id = $1',
       [req.session.userId]
     );
     res.json(result.rows[0] || null);
@@ -251,12 +252,173 @@ async function updateElo(winnerId, loserId, mode, format) {
 }
 
 module.exports = { updateElo }; // À importer où tu gères le game-over
+
+
+// ============================================================
+// FONCTION : Calculer et sauvegarder l'XP après un match
+// Calquée sur updateElo. Met à jour les deux joueurs (gagnant + perdant).
+// Retourne { winner: {...}, loser: {...} } avec le détail par joueur, ou null.
+// ============================================================
+async function updateXp({ winnerId, loserId, mode, format, times, timeInitial, isPrivate }) {
+  if (!winnerId || !loserId) return null; // invités sans session : on skip
+
+  // Récupère l'état actuel des deux joueurs (élo du mode + xp + date dernière victoire)
+  const eloCol = mode === 'quiz' ? 'elo_quiz' : 'elo_images';
+  const res = await pool.query(
+    `SELECT id, xp, ${eloCol} AS elo, last_win_date FROM users WHERE id = ANY($1)`,
+    [[winnerId, loserId]]
+  );
+  const players = {};
+  res.rows.forEach(r => players[r.id] = r);
+
+  const wRow = players[winnerId];
+  const lRow = players[loserId];
+  if (!wRow || !lRow) return null;
+
+  const today = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
+  const winnerLastWin = wRow.last_win_date
+    ? new Date(wRow.last_win_date).toISOString().slice(0, 10)
+    : null;
+  const isFirstWinOfDay = winnerLastWin !== today;
+
+  // Temps restants (dernière manche) : times = { socketId: secondes }
+  // NB : times est indexé par socketId, pas userId. On les passe déjà résolus.
+  const timeLeftWinner = times?.winner ?? 0;
+  const timeLeftLoser = times?.loser ?? 0;
+  const fmt = Number(format) || 1;
+
+  // --- Calcul pour le gagnant ---
+  const winnerCalc = computeMatchXp({
+    isWinner: true,
+    format: fmt,
+    eloSelf: wRow.elo ?? 1000,
+    eloOpponent: lRow.elo ?? 1000,
+    timeLeftSelf: timeLeftWinner,
+    timeLeftOpp: timeLeftLoser,
+    timeInitial: timeInitial || 45,
+    isFirstWinOfDay,
+    isPrivate: !!isPrivate,
+  });
+
+  // --- Calcul pour le perdant ---
+  const loserCalc = computeMatchXp({
+    isWinner: false,
+    format: fmt,
+    eloSelf: lRow.elo ?? 1000,
+    eloOpponent: wRow.elo ?? 1000,
+    timeLeftSelf: timeLeftLoser,
+    timeLeftOpp: timeLeftWinner,
+    timeInitial: timeInitial || 45,
+    isFirstWinOfDay: false,
+    isPrivate: !!isPrivate,
+  });
+
+  const winnerOldXp = wRow.xp ?? 0;
+  const loserOldXp = lRow.xp ?? 0;
+  const winnerNewXp = winnerOldXp + winnerCalc.xp;
+  const loserNewXp = loserOldXp + loserCalc.xp;
+
+  // Sauvegarde : XP du gagnant + date de dernière victoire (pour le bonus quotidien)
+  await pool.query(
+    `UPDATE users SET xp = $1, last_win_date = CURRENT_DATE WHERE id = $2`,
+    [winnerNewXp, winnerId]
+  );
+  await pool.query(
+    `UPDATE users SET xp = $1 WHERE id = $2`,
+    [loserNewXp, loserId]
+  );
+
+  const winnerLvlBefore = levelFromXp(winnerOldXp);
+  const winnerLvlAfter = levelFromXp(winnerNewXp);
+  const loserLvlBefore = levelFromXp(loserOldXp);
+  const loserLvlAfter = levelFromXp(loserNewXp);
+
+  return {
+    winner: {
+      gain: winnerCalc.xp,
+      breakdown: winnerCalc.breakdown,
+      oldXp: winnerOldXp,
+      newXp: winnerNewXp,
+      levelBefore: winnerLvlBefore.level,
+      levelAfter: winnerLvlAfter.level,
+      leveledUp: winnerLvlAfter.level > winnerLvlBefore.level,
+      levelInfo: winnerLvlAfter,
+      isFirstWinOfDay,
+    },
+    loser: {
+      gain: loserCalc.xp,
+      breakdown: loserCalc.breakdown,
+      oldXp: loserOldXp,
+      newXp: loserNewXp,
+      levelBefore: loserLvlBefore.level,
+      levelAfter: loserLvlAfter.level,
+      leveledUp: loserLvlAfter.level > loserLvlBefore.level,
+      levelInfo: loserLvlAfter,
+      isFirstWinOfDay: false,
+    },
+  };
+}
 // File d'attente matchmaking — chaque entrée : { socket, acceptedRounds: [1,3,5] }
 
 app.use(express.static(__dirname));
 
 // On va stocker toutes les parties en cours ici
 const rooms = {};
+
+// =====================================================================
+// REROLLS DE THÈME (matchmaking)
+// ---------------------------------------------------------------------
+// Chaque joueur a droit à 3 rerolls "gratuits" sur 24h glissantes : un
+// reroll consommé redevient disponible 24h après son utilisation.
+// On stocke uniquement les timestamps des rerolls consommés en mémoire
+// (clé = userId quand connu, sinon socket.id en fallback).
+// En cas de redémarrage du serveur, les rerolls consommés sont oubliés
+// (compromis acceptable pour un MVP — déplaçable en BDD plus tard).
+// =====================================================================
+const REROLL_MAX        = 3;
+const REROLL_WINDOW_MS  = 24 * 60 * 60 * 1000; // 24h
+const MATCH_START_DELAY = 5000;                // 5s d'affichage du VS
+const userRerolls = new Map(); // userKey → [timestamp, timestamp, ...]
+
+/** Clé stable pour suivre les rerolls d'un joueur (userId si connecté, sinon socket.id). */
+function rerollKey(socket) {
+  return socket.userId ? `u:${socket.userId}` : `s:${socket.id}`;
+}
+
+/** Nettoie les timestamps > 24h pour la clé donnée et renvoie le tableau à jour. */
+function pruneRerolls(key) {
+  const now = Date.now();
+  const list = (userRerolls.get(key) || []).filter(ts => now - ts < REROLL_WINDOW_MS);
+  if (list.length > 0) userRerolls.set(key, list);
+  else userRerolls.delete(key);
+  return list;
+}
+
+/**
+ * Renvoie l'état des rerolls pour une clé :
+ *  - available     : nombre de rerolls dispo (0..REROLL_MAX)
+ *  - nextUnlockMs  : ms avant qu'un reroll se libère (0 si déjà dispo)
+ */
+function getRerollState(key) {
+  const list = pruneRerolls(key);
+  const available = Math.max(0, REROLL_MAX - list.length);
+  let nextUnlockMs = 0;
+  if (available === 0 && list.length > 0) {
+    const oldest = Math.min(...list);
+    nextUnlockMs = Math.max(0, REROLL_WINDOW_MS - (Date.now() - oldest));
+  }
+  return { available, nextUnlockMs };
+}
+
+/** Tente de consommer un reroll. Renvoie le nouvel état (ou null si refusé). */
+function consumeReroll(key) {
+  const state = getRerollState(key);
+  if (state.available <= 0) return null;
+  const list = userRerolls.get(key) || [];
+  list.push(Date.now());
+  userRerolls.set(key, list);
+  return getRerollState(key);
+}
 
 // Fonction pour générer un code aléatoire à 4 lettres
 function generateRoomCode() {
@@ -435,6 +597,16 @@ function getFormatConfig(format) {
   return FORMAT_CONFIG[format] || FORMAT_CONFIG['1v1'];
 }
 
+// Renvoie true si le format en cours regroupe les joueurs en équipes
+// (chrono partagé par équipe, n'importe quel membre peut répondre).
+// Aujourd'hui seul '1v2' coche cette case ; les futurs formats arcade
+// à équipes seront détectés automatiquement via cfg.teams.
+function isTeamFormat(format) {
+  const cfg = FORMAT_CONFIG[format];
+  if (!cfg || !Array.isArray(cfg.teams)) return false;
+  return cfg.teams.length >= 2 && !cfg.teams.includes('free');
+}
+
 // Initialise la structure room.lobby si elle n'existe pas encore (les anciens
 // salons créés avant cette version n'en ont pas).
 function ensureLobby(room) {
@@ -442,10 +614,16 @@ function ensureLobby(room) {
     room.lobby = {
       slots: {},        // socketId → 'team1' | 'team2' | 'free' | 'spectator'
       nicknames: {},    // socketId → pseudo affiché
+      teamNames: { team1: 'Équipe 1', team2: 'Équipe 2' },
       format: '1v1',
       arcadeMode: false,
       maxActivePlayers: FORMAT_CONFIG['1v1'].maxActivePlayers
     };
+  }
+  // Migration : les salons créés avant le format en équipes n'ont pas
+  // encore de noms d'équipe : on les initialise avec les valeurs par défaut.
+  if (!room.lobby.teamNames) {
+    room.lobby.teamNames = { team1: 'Équipe 1', team2: 'Équipe 2' };
   }
   if (!room.spectators) room.spectators = [];
   return room.lobby;
@@ -532,6 +710,10 @@ function buildLobbyStatePayload(room) {
   return {
     members,
     format: lobby.format || '1v1',
+    teamNames: Object.assign(
+      { team1: 'Équipe 1', team2: 'Équipe 2' },
+      lobby.teamNames || {}
+    ),
     arcadeMode: !!lobby.arcadeMode,
     maxActivePlayers: lobby.maxActivePlayers || 2,
     maxSpectators: MAX_SPECTATORS,
@@ -626,6 +808,14 @@ function startGame(code) {
   const room = rooms[code];
   if (!room || !room.gameState) return;
 
+  // Construire la liste des participants avec leur pseudo pour l'affichage
+  // côté client (en 1v1 il y en a 2, en 1v1v1 jusqu'à 10).
+  const players = (room.players || []).map(id => ({
+    id,
+    nickname: getNickname(room, id),
+    isHost: id === room.host
+  }));
+
   io.to(code).emit('init-game', {
     question: room.gameState.questions[0],
     activePlayerId: room.gameState.activePlayerId,
@@ -638,7 +828,21 @@ function startGame(code) {
     score: room.settings.score || {},
     matchHistory: room.settings.matchHistory || [],
     currentRound: room.settings.currentRound || 1,
-    matchAnswers: room.settings.matchAnswers || []
+    matchAnswers: room.settings.matchAnswers || [],
+    // Nouveau : informations multi-joueurs / arcade
+    format: room.gameState.format || '1v1',
+    players,
+    playOrder: room.gameState.playOrder || (room.players || []).slice(),
+    // En mode équipes : on rappelle les noms d'équipe (utilisés pour
+    // libeller les chronos et le scoreboard côté client).
+    teamNames: (room.lobby && room.lobby.teamNames)
+      ? Object.assign({}, room.lobby.teamNames)
+      : { team1: 'Équipe 1', team2: 'Équipe 2' },
+    // Et la table des appartenances d'équipes (socketId → slot), pour
+    // que le client sache instantanément qui joue dans quelle équipe.
+    playerTeams: (room.lobby && room.lobby.slots)
+      ? Object.assign({}, room.lobby.slots)
+      : {}
   });
 
   // Le client affiche un écran de transition (compte à rebours 3-2-1) pendant
@@ -652,8 +856,50 @@ function startGame(code) {
   }, 2000);
 }
 
-function getActiveRemainingTime(state, now = Date.now()) {
-  if (!state || !state.activePlayerId || !state.times) return 0;
+// =============================================================
+// HELPERS MULTI-JOUEURS (formats arcade 3+ joueurs)
+// -------------------------------------------------------------
+// Renvoie le format actif de la partie en cours. Par défaut '1v1'.
+function getMatchFormat(room) {
+  if (room && room.gameState && room.gameState.format) return room.gameState.format;
+  if (room && room.lobby && room.lobby.format) return room.lobby.format;
+  return '1v1';
+}
+
+// Renvoie le prochain joueur à qui passer la main, en respectant l'ordre
+// fixe (room.gameState.playOrder) et en sautant les joueurs éliminés
+// de la manche en cours. Renvoie null s'il ne reste qu'un seul joueur.
+function getNextPlayerInOrder(state, currentId) {
+  if (!state || !Array.isArray(state.playOrder) || state.playOrder.length === 0) {
+    return null;
+  }
+  const eliminated = state.eliminatedThisRound || [];
+  const order = state.playOrder;
+  const n = order.length;
+  let idx = order.indexOf(currentId);
+  if (idx === -1) idx = -1; // on partira de 0 via le +1 ci-dessous
+  for (let step = 1; step <= n; step++) {
+    const candidate = order[(idx + step) % n];
+    if (candidate === currentId) continue; // sécurité (taille 1)
+    if (!eliminated.includes(candidate)) return candidate;
+  }
+  return null;
+}
+
+// Compte les joueurs encore en lice dans la manche en cours.
+function countActiveThisRound(state) {
+  if (!state || !Array.isArray(state.playOrder)) return 0;
+  const eliminated = state.eliminatedThisRound || [];
+  return state.playOrder.filter(id => !eliminated.includes(id)).length;
+}
+
+// Renvoie le pseudo affiché d'un joueur (utile pour les logs / payloads).
+function getNickname(room, socketId) {
+  return (room && room.lobby && room.lobby.nicknames && room.lobby.nicknames[socketId])
+    || 'Joueur';
+}
+
+function getActiveRemainingTime(state, now = Date.now()) {  if (!state || !state.activePlayerId || !state.times) return 0;
   const activeId = state.activePlayerId;
   const startAt = typeof state.activeTurnStartedAt === 'number'
     ? state.activeTurnStartedAt
@@ -716,25 +962,112 @@ function startRoundTimer(code) {
 
 // Appelé quand un joueur a épuisé son temps sur la manche en cours.
 // loserId = celui dont le timer est tombé à 0.
+//
+// EN 1v1     : fin de manche immédiate, winner = l'autre joueur.
+// EN 1v1v1+ : le joueur est éliminé pour CETTE manche. La main passe au
+//             suivant dans l'ordre. La manche ne se termine que lorsqu'il
+//             ne reste qu'UN seul joueur en lice — ce joueur gagne la manche.
 async function handleRoundEnd(code, loserId) {
   const room = rooms[code];
   if (!room || !room.gameState) return;
-  const winnerId = room.players.find(id => id !== loserId);
-  const winsNeeded = room.settings.winsNeeded || 1;
 
-  // Enregistrer la question qui était à l'écran quand le temps a expiré
-  // (avant d'incrémenter currentRound pour avoir le bon numéro de manche)
+  const format = getMatchFormat(room);
+
+  // Enregistrer la question qui était à l'écran quand le temps a expiré.
+  // En 1v2, loserId est un slot d'équipe : on l'enregistre tel quel sur
+  // `playerId` et on ajoute `playerTeam` pour permettre au client de
+  // détecter "mon équipe a perdu le temps" dans le récap des réponses.
   const timedOutQuestion = room.gameState.questions[room.gameState.currentQuestionIndex];
   if (timedOutQuestion) {
     room.settings.matchAnswers = room.settings.matchAnswers || [];
-    room.settings.matchAnswers.push({
+    const entry = {
       question: timedOutQuestion,
       mode: room.settings.mode || 'images',
       outcome: 'timeout',
       playerId: loserId,
       round: room.settings.currentRound || 1
-    });
+    };
+    if (isTeamFormat(format)) entry.playerTeam = loserId;
+    room.settings.matchAnswers.push(entry);
   }
+
+  // ===== Branche 1v2 (équipes : 2 équipes, pas d'élimination intermédiaire) =====
+  // Comme en 1v1, dès que le chrono d'une équipe tombe à 0, l'autre équipe
+  // remporte la manche immédiatement. Pas de cycle d'éliminations puisqu'il
+  // n'y a que 2 camps.
+  if (isTeamFormat(format)) {
+    const state = room.gameState;
+    const winnerTeam = (loserId === 'team1') ? 'team2' : 'team1';
+    state.times[loserId] = 0;
+    finalizeRoundWin(code, winnerTeam, loserId);
+    return;
+  }
+
+  // ===== Branche MULTI-JOUEURS (1v1v1 etc.) =====
+  if (format !== '1v1') {
+    const state = room.gameState;
+    state.eliminatedThisRound = state.eliminatedThisRound || [];
+
+    // Mémoriser le 1er éliminé de cette manche : il commencera la suivante.
+    if (state.eliminatedThisRound.length === 0) {
+      state.firstEliminatedThisRound = loserId;
+    }
+    state.eliminatedThisRound.push(loserId);
+
+    const remaining = countActiveThisRound(state);
+
+    if (remaining >= 2) {
+      // La manche continue : on passe la main au suivant dans l'ordre,
+      // en sautant les déjà-éliminés.
+      const next = getNextPlayerInOrder(state, loserId);
+      state.times[loserId] = 0;
+      state.activePlayerId = next;
+      state.activeTurnStartedAt = null;
+      state.activeTurnStartValue = null;
+
+      // Question suivante (on n'attend pas une bonne réponse pour avancer)
+      state.currentQuestionIndex++;
+      if (state.currentQuestionIndex >= state.questions.length) {
+        state.questions = shuffleByDifficulty([...state.questions]);
+        state.currentQuestionIndex = 0;
+      }
+
+      io.to(code).emit('player-eliminated', {
+        eliminatedPlayerId: loserId,
+        activePlayerId: state.activePlayerId,
+        times: state.times,
+        eliminatedThisRound: state.eliminatedThisRound.slice(),
+        nextQuestion: state.questions[state.currentQuestionIndex],
+        matchAnswers: room.settings.matchAnswers || []
+      });
+      startRoundTimer(code);
+      return;
+    }
+
+    // Il ne reste qu'un joueur → manche terminée, il gagne la manche.
+    const survivors = state.playOrder.filter(id => !state.eliminatedThisRound.includes(id));
+    const winnerId = survivors[0];
+    const firstEliminated = state.firstEliminatedThisRound;
+    state.times[loserId] = 0;
+
+    finalizeRoundWin(code, winnerId, firstEliminated);
+    return;
+  }
+
+  // ===== Branche 1v1 (comportement historique inchangé) =====
+  const winnerId = room.players.find(id => id !== loserId);
+  finalizeRoundWin(code, winnerId, loserId);
+}
+
+// Logique commune de fin de manche : incrémente le score, vérifie la fin de
+// match, et déclenche soit `game-over` soit `round-end` + retour au lobby.
+// `nextStarterId` = qui commence la manche suivante (loser en 1v1, premier
+// éliminé en 1v1v1).
+async function finalizeRoundWin(code, winnerId, nextStarterId) {
+  const room = rooms[code];
+  if (!room || !room.gameState) return;
+  const format = getMatchFormat(room);
+  const winsNeeded = room.settings.winsNeeded || 1;
 
   // Mettre à jour l'historique et le score dans room.settings (persiste entre manches)
   room.settings.matchHistory = room.settings.matchHistory || [];
@@ -742,7 +1075,7 @@ async function handleRoundEnd(code, loserId) {
   room.settings.score = room.settings.score || {};
   room.settings.score[winnerId] = (room.settings.score[winnerId] || 0) + 1;
   room.settings.currentRound = (room.settings.currentRound || 1) + 1;
-  room.settings.nextRoundStarterId = loserId;
+  room.settings.nextRoundStarterId = nextStarterId;
 
   const score = room.settings.score;
   const matchHistory = room.settings.matchHistory;
@@ -751,15 +1084,17 @@ async function handleRoundEnd(code, loserId) {
 
   // Match terminé ?
   if (score[winnerId] >= winsNeeded) {
+    // Identifier le ou les perdants (utilisé surtout par le matchmaking 1v1)
+    const loserId = room.players.find(id => id !== winnerId) || null;
+
     // Nettoyer l'état du match pour la prochaine partie.
-    // matchAnswers reste disponible (envoyé dans game-over) jusqu'au prochain start-game.
     room.settings.matchHistory = undefined;
     room.settings.score = undefined;
     room.settings.currentRound = 1;
     room.settings.nextRoundStarterId = null;
 
     let eloChanges = null;
-    if (code.startsWith('MATCH-')) {
+    if (code.startsWith('MATCH-') && format === '1v1') {
       const winnerSocket = [...io.sockets.sockets.values()].find(s => s.id === winnerId);
       const loserSocket = [...io.sockets.sockets.values()].find(s => s.id === loserId);
       const winnerUserId = winnerSocket?.userId || null;
@@ -770,7 +1105,6 @@ async function handleRoundEnd(code, loserId) {
       if (winnerUserId && loserUserId) {
         try {
           eloChanges = await updateElo(winnerUserId, loserUserId, matchMode, matchFormat);
-          // Met à jour l'élo en mémoire sur le socket pour la prochaine partie
           if (winnerSocket && eloChanges) {
             if (matchMode === 'quiz') winnerSocket.eloQuiz = eloChanges.winner.newElo;
             else winnerSocket.eloImages = eloChanges.winner.newElo;
@@ -784,25 +1118,95 @@ async function handleRoundEnd(code, loserId) {
         }
       }
     }
-    io.to(code).emit('game-over', { winnerId, score, matchHistory, matchAnswers, eloChanges });
+
+    // ----- GAIN D'XP : matchmaking ET parties privées (réduit en privé) -----
+    // On gagne de l'XP dès que c'est un duel 1v1 avec deux comptes identifiés.
+    let xpChanges = null;
+    if (format === '1v1') {
+      const winnerSocket = [...io.sockets.sockets.values()].find(s => s.id === winnerId);
+      const loserSocket = [...io.sockets.sockets.values()].find(s => s.id === loserId);
+      const winnerUserId = winnerSocket?.userId || null;
+      const loserUserId = loserSocket?.userId || null;
+      const matchMode = room.settings?.mode || 'images';
+      const matchFormat = room.settings?.rounds || 1;
+      const isPrivate = !code.startsWith('MATCH-'); // tout ce qui n'est pas matchmaking
+      const timeInitial = room.settings?.timer || 45;
+
+      // Temps restants de la dernière manche (times indexé par socketId)
+      const lastTimes = (room.gameState && room.gameState.times) || {};
+
+      if (winnerUserId && loserUserId) {
+        try {
+          xpChanges = await updateXp({
+            winnerId: winnerUserId,
+            loserId: loserUserId,
+            mode: matchMode,
+            format: matchFormat,
+            times: {
+              winner: Number(lastTimes[winnerId] ?? 0),
+              loser: Number(lastTimes[loserId] ?? 0),
+            },
+            timeInitial,
+            isPrivate,
+          });
+          // Mémoriser le nouvel XP sur le socket (cohérent avec l'élo)
+          if (winnerSocket && xpChanges) winnerSocket.xp = xpChanges.winner.newXp;
+          if (loserSocket && xpChanges) loserSocket.xp = xpChanges.loser.newXp;
+        } catch (err) {
+          console.error('Erreur updateXp :', err);
+        }
+      }
+    }
+    io.to(code).emit('game-over', {
+      winnerId,
+      score,
+      matchHistory,
+      matchAnswers,
+      eloChanges,
+      xpChanges,
+      format,
+      players: (room.players || []).map(id => ({
+        id,
+        nickname: getNickname(room, id),
+        isHost: id === room.host
+      })),
+      teamNames: (room.lobby && room.lobby.teamNames)
+        ? Object.assign({}, room.lobby.teamNames)
+        : { team1: 'Équipe 1', team2: 'Équipe 2' },
+      playerTeams: (room.lobby && room.lobby.slots)
+        ? Object.assign({}, room.lobby.slots)
+        : {}
+    });
     return;
   }
 
-  // Fin de manche sans fin de match :
-  // 1. Informer les clients du résultat
+  // Fin de manche sans fin de match : informer les clients du résultat.
   io.to(code).emit('round-end', {
     roundWinnerId: winnerId,
-    roundLoserId: loserId,
+    roundLoserId: (format === '1v1' || isTeamFormat(format) ? nextStarterId : null),
+    firstEliminatedId: (format === '1v1' || isTeamFormat(format) ? null : nextStarterId),
     score,
     matchHistory,
     nextRound,
-    matchAnswers
+    matchAnswers,
+    format,
+    players: (room.players || []).map(id => ({
+      id,
+      nickname: getNickname(room, id),
+      isHost: id === room.host
+    })),
+    teamNames: (room.lobby && room.lobby.teamNames)
+      ? Object.assign({}, room.lobby.teamNames)
+      : { team1: 'Équipe 1', team2: 'Équipe 2' },
+    playerTeams: (room.lobby && room.lobby.slots)
+      ? Object.assign({}, room.lobby.slots)
+      : {}
   });
 
   const isMatchmaking = code.startsWith('MATCH-');
 
   if (isMatchmaking) {
-    // Matchmaking : relance automatique après 3s
+    // Matchmaking : relance automatique après 3s (1v1 uniquement)
     room.gameState.transitionTimeout = setTimeout(() => {
       const r = rooms[code];
       if (!r || !r.gameState) return;
@@ -810,7 +1214,7 @@ async function handleRoundEnd(code, loserId) {
         [r.players[0]]: r.settings.timer,
         [r.players[1]]: r.settings.timer
       };
-      r.gameState.activePlayerId = loserId;
+      r.gameState.activePlayerId = nextStarterId;
       if (r.gameState.currentQuestionIndex >= r.gameState.questions.length) {
         r.gameState.questions = shuffleByDifficulty([...r.gameState.questions]);
         r.gameState.currentQuestionIndex = 0;
@@ -828,7 +1232,9 @@ async function handleRoundEnd(code, loserId) {
       startRoundTimer(code);
     }, 3000);
   } else {
-    // Partie privée : retour au salon après 2s
+    // Partie privée : retour au salon après 2s (1v1) ou 3.5s (multi-joueurs)
+    // pour laisser le temps à l'animation du classement de se jouer côté client.
+    const privateTransitionMs = (format === '1v1') ? 2000 : 3500;
     room.gameState.transitionTimeout = setTimeout(() => {
       const r = rooms[code];
       if (!r) return;
@@ -842,7 +1248,7 @@ async function handleRoundEnd(code, loserId) {
         winsNeeded: r.settings.winsNeeded,
         matchAnswers: r.settings.matchAnswers || []
       });
-    }, 2000);
+    }, privateTransitionMs);
   }
 }
 
@@ -3648,6 +4054,11 @@ io.on('connection', async (socket) => {
         }
         const players = [p1.id, p2.id].sort(() => Math.random() - 0.5);
 
+        // Clés reroll des deux joueurs (mémorisées pour les events à venir)
+        const p1Key = rerollKey(p1);
+        const p2Key = rerollKey(p2);
+        const matchStartAfter = Date.now() + MATCH_START_DELAY;
+
         rooms[code] = {
           players,
           settings: {
@@ -3671,17 +4082,32 @@ io.on('connection', async (socket) => {
             currentQuestionIndex: 0,
             activePlayerId: players[0],
             times: { [players[0]]: 60, [players[1]]: 60 }
+          },
+          // --- État spécifique au matchmaking (écran VS + rerolls) ---
+          matchmaking: {
+            rerollKeys: { [p1.id]: p1Key, [p2.id]: p2Key },
+            matchStartAfter
           }
         };
 
-        io.to(code).emit('match-found', {
+        // États de reroll initiaux à envoyer aux deux joueurs
+        const p1State = getRerollState(p1Key);
+        const p2State = getRerollState(p2Key);
+
+        // On émet à chaque joueur individuellement pour personnaliser
+        // "myRerolls" vs "opponentRerolls".
+        const basePayload = {
           p1Name: p1.nickname,
           p2Name: p2.nickname,
           mode,
           theme: selectedTheme,
           activePlayerId: players[0],
-          roomCode: code
-        });
+          roomCode: code,
+          matchStartAfter,
+          matchStartDelayMs: MATCH_START_DELAY
+        };
+        p1.emit('match-found', { ...basePayload, myRerolls: p1State, opponentRerolls: p2State });
+        p2.emit('match-found', { ...basePayload, myRerolls: p2State, opponentRerolls: p1State });
         console.log(`Match trouvé ! Mode ${mode} BO${rounds} Élo: ${p1.elo} vs ${p2.elo} (fenêtre: ±${eloWindow}) — ${code}`);
       }
     }
@@ -3712,6 +4138,7 @@ io.on('connection', async (socket) => {
       lobby: {
         slots: { [socket.id]: 'free' },
         nicknames: { [socket.id]: socket.nickname || 'Joueur' },
+        teamNames: { team1: 'Équipe 1', team2: 'Équipe 2' },
         format: '1v1',
         arcadeMode: false,
         maxActivePlayers: FORMAT_CONFIG['1v1'].maxActivePlayers
@@ -3942,6 +4369,36 @@ io.on('connection', async (socket) => {
     });
   });
 
+  // --- Renommage d'une équipe (1v2 et futurs formats à équipes) ---
+  // Seul un membre de l'équipe concernée peut changer son nom.
+  socket.on('lobby-team-rename', (data) => {
+    if (!data || !data.code) return;
+    const room = rooms[data.code];
+    if (!room) return;
+    ensureLobby(room);
+
+    const teamSlot = data.teamSlot;
+    const rawName = String(data.newName || '').trim();
+    // Seuls les slots d'équipes connus sont acceptés.
+    if (!teamSlot || !['team1', 'team2'].includes(teamSlot)) return;
+    if (!rawName) return;
+
+    // Vérifier que l'auteur est bien membre de cette équipe (côté serveur :
+    // empêche n'importe quel client de renommer l'équipe adverse).
+    const mySlot = room.lobby.slots && room.lobby.slots[socket.id];
+    if (mySlot !== teamSlot) return;
+
+    // Limite raisonnable de longueur pour ne pas casser le rendu.
+    const cleanName = rawName.slice(0, 24);
+
+    room.lobby.teamNames = room.lobby.teamNames
+      || { team1: 'Équipe 1', team2: 'Équipe 2' };
+    if (room.lobby.teamNames[teamSlot] === cleanName) return; // rien à faire
+    room.lobby.teamNames[teamSlot] = cleanName;
+
+    broadcastLobbyState(data.code);
+  });
+
   // --- 3. LANCER LA PARTIE (Lobby Privé) ---
   socket.on('start-game', (data) => {
     const room = rooms[data.code];
@@ -3957,17 +4414,51 @@ io.on('connection', async (socket) => {
     room.settings.timer = parseInt(data.timer);
     room.settings.mode = mode;
 
+    // Détecter le format actif depuis le lobby (par défaut '1v1').
+    ensureLobby(room);
+    const matchFormat = (room.lobby && room.lobby.format) || '1v1';
+    const teamFormat = isTeamFormat(matchFormat);
+
+    // ===== Validation : en format équipes, on exige ≥1 joueur par équipe =====
+    if (teamFormat) {
+      const cfg = getFormatConfig(matchFormat);
+      const teamCounts = {};
+      cfg.teams.forEach(t => { teamCounts[t] = 0; });
+      for (const sid of room.players) {
+        const slot = room.lobby.slots[sid];
+        if (slot in teamCounts) teamCounts[slot]++;
+      }
+      const emptyTeam = cfg.teams.find(t => teamCounts[t] === 0);
+      if (emptyTeam) {
+        socket.emit('error-message', "Chaque équipe doit compter au moins un joueur pour lancer la partie.");
+        return;
+      }
+    }
+
     // Un matchHistory défini = continuation d'un match en cours
     // (les manches gagnantes, le score et l'historique sont conservés)
     const isContinuation = Array.isArray(room.settings.matchHistory);
 
     if (!isContinuation) {
-      // Nouveau match : initialiser toutes les données de match
+      // Nouveau match : initialiser toutes les données de match.
       const requestedRounds = parseInt(data.rounds, 10);
       const rounds = [1, 3, 5].includes(requestedRounds) ? requestedRounds : 1;
       room.settings.rounds = rounds;
-      room.settings.winsNeeded = Math.ceil(rounds / 2);
-      room.settings.score = { [room.players[0]]: 0, [room.players[1]]: 0 };
+      // En 1v1 et 1v2 : winsNeeded = ceil(rounds/2)  (BO3 → 2 victoires, BO5 → 3)
+      // En 1v1v1+ : winsNeeded = rounds              (BO3 → 3 victoires, BO5 → 5)
+      room.settings.winsNeeded = (matchFormat === '1v1' || teamFormat)
+        ? Math.ceil(rounds / 2)
+        : rounds;
+      // Score initial :
+      //   • formats à joueurs : un score par socketId
+      //   • formats à équipes : un score par slot d'équipe
+      const initialScore = {};
+      if (teamFormat) {
+        getFormatConfig(matchFormat).teams.forEach(t => { initialScore[t] = 0; });
+      } else {
+        room.players.forEach(id => { initialScore[id] = 0; });
+      }
+      room.settings.score = initialScore;
       room.settings.matchHistory = [];
       room.settings.currentRound = 1;
       room.settings.nextRoundStarterId = null;
@@ -3987,19 +4478,61 @@ io.on('connection', async (socket) => {
       selectedQuestions = shuffleByDifficulty([...allQuestions['athletes']]);
     }
 
-    // Pour une continuation, le perdant de la manche précédente commence
-    const activePlayerId = isContinuation
-      ? (room.settings.nextRoundStarterId || room.players[0])
-      : room.players[0];
+    // Pour une continuation, le starter est :
+    //   • 1v1     : le perdant de la manche précédente
+    //   • 1v1v1+ : le 1er éliminé de la manche précédente
+    //   • 1v2    : l'équipe qui a perdu la manche précédente
+    // (tous sont stockés dans nextRoundStarterId par finalizeRoundWin)
+    let activePlayerId;
+    let initialTimes;
+    let playOrder;
+
+    if (teamFormat) {
+      // ===== Initialisation du game state en mode équipes =====
+      // L'"activePlayerId" est en réalité le slot d'équipe active. Le client
+      // résoudra "est-ce mon tour" en comparant son propre slot d'équipe.
+      const cfg = getFormatConfig(matchFormat);
+      if (isContinuation) {
+        // Continuation : l'équipe qui a perdu la manche précédente commence.
+        activePlayerId = room.settings.nextRoundStarterId || cfg.teams[0];
+      } else {
+        // Première manche : équipe qui commence tirée au hasard (équité).
+        activePlayerId = cfg.teams[Math.floor(Math.random() * cfg.teams.length)];
+      }
+
+      // Un seul chrono par équipe, partagé par tous ses membres.
+      initialTimes = {};
+      cfg.teams.forEach(t => { initialTimes[t] = room.settings.timer; });
+
+      // L'ordre de passage alterne entre les équipes.
+      playOrder = cfg.teams.slice();
+    } else {
+      // ===== Comportement historique (1v1 et 1v1v1+) =====
+      if (isContinuation) {
+        // Continuation : le perdant / 1er éliminé de la manche précédente commence.
+        activePlayerId = room.settings.nextRoundStarterId || room.players[0];
+      } else {
+        // Première manche : joueur qui commence tiré au hasard (équité hôte/invité).
+        activePlayerId = room.players[Math.floor(Math.random() * room.players.length)];
+      }
+
+      initialTimes = {};
+      room.players.forEach(id => { initialTimes[id] = room.settings.timer; });
+
+      playOrder = room.players.slice();
+    }
 
     room.gameState = {
+      format: matchFormat,
       questions: selectedQuestions,
       currentQuestionIndex: 0,
       activePlayerId,
-      times: {
-        [room.players[0]]: room.settings.timer,
-        [room.players[1]]: room.settings.timer
-      }
+      times: initialTimes,
+      // Pour 1v1v1+ : ordre fixe des joueurs et suivi des éliminations.
+      // Pour 1v2     : ordre fixe des équipes ['team1','team2'] (pas d'élim).
+      playOrder,
+      eliminatedThisRound: [],
+      firstEliminatedThisRound: null
     };
 
     startGame(data.code);
@@ -4021,9 +4554,18 @@ io.on('connection', async (socket) => {
     const room = rooms[code];
     if (!room || !room.gameState) return; // partie déjà annulée / terminée
     const state = room.gameState;
+    const format = getMatchFormat(room);
+    const teamFormat = isTeamFormat(format);
 
-    // On vérifie que c'est bien son tour
-    if (state.activePlayerId !== socket.id) return;
+    // Vérifier que le joueur a le droit de répondre.
+    //   • formats classiques : c'est mon tour si activePlayerId === socket.id
+    //   • formats équipes    : c'est mon tour si mon slot d'équipe === activePlayerId
+    if (teamFormat) {
+      const myTeam = room.lobby && room.lobby.slots && room.lobby.slots[socket.id];
+      if (!myTeam || myTeam !== state.activePlayerId) return;
+    } else {
+      if (state.activePlayerId !== socket.id) return;
+    }
 
     const currentQ = state.questions[state.currentQuestionIndex];
     const respondingPlayer = socket.id;
@@ -4040,15 +4582,17 @@ io.on('connection', async (socket) => {
       // On fait ça AVANT d'incrémenter currentQuestionIndex pour bien tenir
       // la question qui vient d'être trouvée, pas la suivante.
       room.settings.matchAnswers = room.settings.matchAnswers || [];
-      room.settings.matchAnswers.push({
+      const answerEntry = {
         question: currentQ,
         mode: room.settings.mode || 'images',
         outcome: 'correct',
         playerId: respondingPlayer,
         round: room.settings.currentRound || 1
-      });
+      };
+      if (teamFormat) answerEntry.playerTeam = state.activePlayerId;
+      room.settings.matchAnswers.push(answerEntry);
 
-      // Figer le temps exact du joueur actif avant de changer de tour.
+      // Figer le temps exact du joueur/équipe actif avant de changer de tour.
       // Sans ça, state.times garde la dernière seconde entière envoyée
       // par setInterval et le client voit le chrono remonter après réponse.
       freezeActiveTimer(state);
@@ -4063,8 +4607,18 @@ io.on('connection', async (socket) => {
         state.timerInterval = null;
       }
 
-      // Changement de joueur
-      state.activePlayerId = room.players.find(id => id !== socket.id);
+      // Changement de "joueur actif" :
+      //   • mode équipes : on passe à l'équipe adverse.
+      //   • mode classique : on passe au joueur suivant dans l'ordre,
+      //     en sautant les déjà-éliminés (utile en 1v1v1+).
+      if (teamFormat) {
+        const nextTeam = getNextPlayerInOrder(state, state.activePlayerId);
+        state.activePlayerId = nextTeam || state.activePlayerId;
+      } else {
+        const nextPlayerId = getNextPlayerInOrder(state, socket.id);
+        // Fallback 1v1 si getNextPlayerInOrder ne renvoie rien (ne devrait pas arriver) :
+        state.activePlayerId = nextPlayerId || room.players.find(id => id !== socket.id);
+      }
 
       io.to(code).emit('next-round', {
         nextQuestion: state.questions[state.currentQuestionIndex],
@@ -4074,7 +4628,7 @@ io.on('connection', async (socket) => {
         matchAnswers: room.settings.matchAnswers
       });
 
-      // Relancer le timer sur le nouveau joueur actif.
+      // Relancer le timer sur le nouveau joueur/équipe actif.
       startRoundTimer(code);
     } else {
       // Mauvaise réponse : informer les deux clients pour déclencher l'animation "lose"
@@ -4090,28 +4644,40 @@ io.on('connection', async (socket) => {
     const room = rooms[code];
     if (!room || !room.gameState) return; // partie déjà annulée / terminée
     const state = room.gameState;
+    const format = getMatchFormat(room);
+    const teamFormat = isTeamFormat(format);
 
-    // Sécurité : si ce n'est pas son tour, on bloque
-    if (state.activePlayerId !== socket.id) return;
+    // Sécurité : si ce n'est pas son tour, on bloque.
+    //   • mode équipes : il faut être membre de l'équipe active.
+    //   • mode classique : il faut être le joueur actif.
+    if (teamFormat) {
+      const myTeam = room.lobby && room.lobby.slots && room.lobby.slots[socket.id];
+      if (!myTeam || myTeam !== state.activePlayerId) return;
+    } else {
+      if (state.activePlayerId !== socket.id) return;
+    }
 
     // Enregistrer la question passée dans l'historique (avant d'incrémenter l'index)
     const passedQuestion = state.questions[state.currentQuestionIndex];
     if (passedQuestion) {
       room.settings.matchAnswers = room.settings.matchAnswers || [];
-      room.settings.matchAnswers.push({
+      const passEntry = {
         question: passedQuestion,
         mode: room.settings.mode || 'images',
         outcome: 'passed',
         playerId: socket.id,
         round: room.settings.currentRound || 1
-      });
+      };
+      if (teamFormat) passEntry.playerTeam = state.activePlayerId;
+      room.settings.matchAnswers.push(passEntry);
     }
 
     // Notifier les deux clients pour déclencher les pleurs sur celui qui passe
     io.to(code).emit('passing', { playerId: socket.id });
 
-    // Figer le temps exact avant de passer : le joueur reste actif, mais son
-    // chrono doit repartir de la vraie valeur courante, pas de la seconde entière.
+    // Figer le temps exact avant de passer : le joueur/équipe reste actif, mais
+    // son chrono doit repartir de la vraie valeur courante, pas de la seconde
+    // entière.
     freezeActiveTimer(state);
 
     // Passer directement à la question suivante
@@ -4131,7 +4697,7 @@ io.on('connection', async (socket) => {
       matchAnswers: room.settings.matchAnswers || []
     });
 
-    // Relancer le timer sur le joueur actif (inchangé lors d'un pass).
+    // Relancer le timer sur le joueur/équipe actif (inchangé lors d'un pass).
     startRoundTimer(code);
   });
 
@@ -4139,13 +4705,115 @@ io.on('connection', async (socket) => {
   socket.on('matchmaking-ready', (data) => {
     console.log(`matchmaking-ready reçu de ${socket.id} pour ${data.code}`);
     const room = rooms[data.code];
+    if (!room || !room.gameState) return;
 
-    // Sécurité : Seul le joueur qui doit commencer peut déclencher le départ 
+    // Sécurité : Seul le joueur qui doit commencer peut déclencher le départ
     // pour éviter que l'événement soit reçu deux fois.
-    if (room && room.gameState.activePlayerId === socket.id) {
-      console.log(`Le match ${data.code} commence !`);
-      startGame(data.code);
+    if (room.gameState.activePlayerId !== socket.id) return;
+
+    // Sécurité reroll : on n'autorise le démarrage que si le délai d'affichage
+    // VS (5s, prolongé à chaque reroll) est bien écoulé. Si le client envoie
+    // matchmaking-ready trop tôt (race condition / triche / bug), on replanifie
+    // le démarrage pour la fin du délai en cours, plutôt que de l'ignorer.
+    const mm = room.matchmaking;
+    if (mm && Date.now() < mm.matchStartAfter) {
+      const wait = mm.matchStartAfter - Date.now();
+      console.log(`matchmaking-ready trop tôt pour ${data.code} (encore ${wait}ms) — replanifié`);
+      // On annule un éventuel timeout déjà programmé pour éviter les double-starts
+      if (mm.startTimeout) clearTimeout(mm.startTimeout);
+      mm.startTimeout = setTimeout(() => {
+        const r = rooms[data.code];
+        if (r && r.gameState && r.matchmaking && !r.matchmaking.started) {
+          console.log(`Le match ${data.code} commence (différé) !`);
+          r.matchmaking.started = true;
+          r.matchmaking.startTimeout = null;
+          startGame(data.code);
+        }
+      }, wait);
+      return;
     }
+
+    console.log(`Le match ${data.code} commence !`);
+    if (mm) {
+      if (mm.startTimeout) { clearTimeout(mm.startTimeout); mm.startTimeout = null; }
+      mm.started = true;
+    }
+    startGame(data.code);
+  });
+
+  // --- 3.3.bis REROLL DU THÈME (matchmaking uniquement) ---
+  // Un joueur a 3 rerolls "gratuits" par fenêtre glissante de 24h. Un reroll
+  // consommé redevient disponible 24h après son utilisation. À chaque reroll
+  // réussi, le thème change (toujours différent de l'ancien) et le compte
+  // à rebours d'affichage de l'écran VS repart à 5s pour les deux joueurs.
+  socket.on('reroll-theme', (data) => {
+    const code = data && data.code;
+    const room = code ? rooms[code] : null;
+    if (!room || !room.matchmaking || !room.gameState) return;
+
+    // Seuls les deux joueurs du duel peuvent reroll
+    if (!room.players.includes(socket.id)) return;
+
+    // Reroll interdit une fois la partie lancée (sécurité)
+    if (room.matchmaking.started) return;
+
+    const key = room.matchmaking.rerollKeys[socket.id] || rerollKey(socket);
+    const newState = consumeReroll(key);
+    if (!newState) {
+      // Quota épuisé : on renvoie l'état actuel au joueur pour resync
+      const current = getRerollState(key);
+      socket.emit('reroll-denied', {
+        myRerolls: current,
+        reason: 'quota_exhausted'
+      });
+      return;
+    }
+
+    // Choix d'un nouveau thème, garanti différent du précédent
+    const mode = room.settings.mode;
+    const pool = (mode === 'quiz') ? QUIZ_THEMES : IMAGE_THEMES;
+    const previousTheme = room.settings.theme;
+    let newTheme = previousTheme;
+    if (pool.length > 1) {
+      const candidates = pool.filter(t => t !== previousTheme);
+      newTheme = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    // Nouveau set de questions, basé sur le nouveau thème
+    const sourceQuestions = (mode === 'quiz')
+      ? quizQuestions[newTheme]
+      : allQuestions[newTheme];
+    const newQuestions = shuffleByDifficulty([...sourceQuestions]);
+
+    room.settings.theme = newTheme;
+    room.gameState.questions = newQuestions;
+    room.gameState.currentQuestionIndex = 0;
+
+    // Le compte à rebours d'affichage repart à 5s à partir de maintenant
+    room.matchmaking.matchStartAfter = Date.now() + MATCH_START_DELAY;
+    if (room.matchmaking.startTimeout) {
+      clearTimeout(room.matchmaking.startTimeout);
+      room.matchmaking.startTimeout = null;
+    }
+
+    // Recalcule les états de reroll des deux joueurs (celui de l'auteur a changé)
+    const [pidA, pidB] = room.players;
+    const stateA = getRerollState(room.matchmaking.rerollKeys[pidA]);
+    const stateB = getRerollState(room.matchmaking.rerollKeys[pidB]);
+
+    // On émet à chaque joueur individuellement pour personnaliser my/opponent
+    const basePayload = {
+      theme: newTheme,
+      byPlayerId: socket.id,
+      matchStartAfter: room.matchmaking.matchStartAfter,
+      matchStartDelayMs: MATCH_START_DELAY
+    };
+    const sockA = io.sockets.sockets.get(pidA);
+    const sockB = io.sockets.sockets.get(pidB);
+    if (sockA) sockA.emit('theme-rerolled', { ...basePayload, myRerolls: stateA, opponentRerolls: stateB });
+    if (sockB) sockB.emit('theme-rerolled', { ...basePayload, myRerolls: stateB, opponentRerolls: stateA });
+
+    console.log(`Reroll thème dans ${code} par ${socket.id} : ${previousTheme} → ${newTheme} (reste ${newState.available}/${REROLL_MAX})`);
   });
 
   // --- 3.4 INTERROMPRE UNE PARTIE EN COURS (bouton retour pendant le duel) ---
@@ -4163,6 +4831,12 @@ io.on('connection', async (socket) => {
         if (room.gameState.transitionTimeout) clearTimeout(room.gameState.transitionTimeout);
         if (room.gameState.startGameTimeout)  clearTimeout(room.gameState.startGameTimeout);
         room.gameState = null;
+    }
+
+    // Nettoyage du timeout de démarrage matchmaking (phase écran VS)
+    if (room.matchmaking && room.matchmaking.startTimeout) {
+      clearTimeout(room.matchmaking.startTimeout);
+      room.matchmaking.startTimeout = null;
     }
 
     // Prévenir l'autre joueur

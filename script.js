@@ -18,6 +18,9 @@ async function initUser() {
     if (eloQuizEl) eloQuizEl.textContent = currentUser.elo_quiz;
     if (eloImagesEl) eloImagesEl.textContent = currentUser.elo_images;
 
+    // Niveau + barre XP dans le HUD
+    if (typeof updateXpHUD === 'function') updateXpHUD(currentUser.xp || 0);
+
     initProfileHUD();
 
   } catch (err) {
@@ -41,6 +44,11 @@ let currentMatchRounds = 1;
 let currentOpponentId = null;
 let matchHistory = [];       // winnerId pour chaque manche terminée
 let matchInProgress = false; // true entre deux manches d'un même match
+
+// True quand je viens d'être éliminé de la manche en cours (formats 1v1v1+).
+// Mis à true par player-eliminated quand c'est moi qui suis sorti, remis à
+// false à chaque init-game / round-start (nouvelle manche / nouveau match).
+let iAmEliminatedThisRound = false;
 
 // Historique des questions/réponses du match en cours (alimenté par le serveur).
 // Utilisé par l'écran "Réponses" accessible depuis le lobby.
@@ -167,23 +175,12 @@ function applyBarColor(barEl, value) {
 }
 
 // Boucle d'animation : recalcule le texte + la largeur de barre à chaque frame.
+// Itère sur toutes les pastilles présentes (`[data-player-pill]`), ce qui
+// supporte indifféremment le format 1v1 (2 pastilles fixes en HTML) et les
+// formats multi-joueurs 1v1v1+ (N pastilles créées dynamiquement).
 function renderTimerFrame() {
-  const mySecsEl = document.getElementById('my-time-secs');
-  const myCentisEl = document.getElementById('my-time-centis');
-  const oppSecsEl = document.getElementById('opp-time-secs');
-  const oppCentisEl = document.getElementById('opp-time-centis');
-  const myBarEl = document.getElementById('timer-bar-me');
-  const oppBarEl = document.getElementById('timer-bar-opp');
-  if (!mySecsEl || !oppSecsEl) return;
-
-  // Identifier l'adversaire à partir des times reçus.
-  let oppId = null;
-  for (const id in timerState.serverTimes) {
-    if (id !== socket.id) { oppId = id; break; }
-  }
-
-  const myValue = getInterpolatedTime(socket.id);
-  const oppValue = oppId ? getInterpolatedTime(oppId) : 0;
+  const pills = document.querySelectorAll('#scoreboard [data-player-pill]');
+  if (!pills.length) return;
 
   // Écrire secondes et centièmes séparément pour que les deux-points
   // restent fixes (ils sont dans leur propre span .tv-sep).
@@ -192,19 +189,37 @@ function renderTimerFrame() {
     const totalCentis = Math.floor(value * 100 + 1e-9);
     const s = Math.floor(totalCentis / 100);
     const c = totalCentis % 100;
-    secsEl.textContent = s;
-    centisEl.textContent = String(c).padStart(2, '0');
+    if (secsEl) secsEl.textContent = s;
+    if (centisEl) centisEl.textContent = String(c).padStart(2, '0');
   }
 
-  renderSplit(mySecsEl, myCentisEl, myValue);
-  renderSplit(oppSecsEl, oppCentisEl, oppValue);
-
   const max = timerState.maxRoundTime || 1;
-  const myPct = Math.max(0, Math.min(100, (myValue / max) * 100));
-  const oppPct = Math.max(0, Math.min(100, (oppValue / max) * 100));
 
-  if (myBarEl) { myBarEl.style.width = myPct + '%'; applyBarColor(myBarEl, myValue); }
-  if (oppBarEl) { oppBarEl.style.width = oppPct + '%'; applyBarColor(oppBarEl, oppValue); }
+  pills.forEach(pill => {
+    // Le data-player-id est posé à chaque init-game (et est manquant tout au début) ;
+    // dans ce cas, on retombe sur la convention "me"/"opp" pour préserver le 1v1.
+    const role = pill.getAttribute('data-pill-role');
+    let pid = pill.getAttribute('data-player-id');
+    if (!pid && role === 'me') pid = socket.id;
+    if (!pid && role === 'opp') {
+      for (const id in timerState.serverTimes) {
+        if (id !== socket.id) { pid = id; break; }
+      }
+    }
+    if (!pid) return;
+
+    const secsEl = pill.querySelector('[data-timer-secs]');
+    const centisEl = pill.querySelector('[data-timer-centis]');
+    const barEl = pill.querySelector('[data-timer-bar]');
+
+    const value = getInterpolatedTime(pid);
+    renderSplit(secsEl, centisEl, value);
+    const pct = Math.max(0, Math.min(100, (value / max) * 100));
+    if (barEl) {
+      barEl.style.width = pct + '%';
+      applyBarColor(barEl, value);
+    }
+  });
 }
 
 function ensureTimerLoop() {
@@ -642,6 +657,12 @@ document.getElementById('btn-matchmaking').addEventListener('click', () => {
 
 document.getElementById('btn-back-matchmaking').addEventListener('click', () => {
   socket.emit('leave-matchmaking');
+  // Si on quitte pendant l'écran VS, on stoppe le countdown et l'envoi
+  // automatique de matchmaking-ready (sinon la partie démarrerait dans le vide).
+  clearVsTimers();
+  vsCurrentRoomCode = null;
+  const counter = document.getElementById('match-start-counter');
+  if (counter) counter.textContent = '';
   document.getElementById('matchmaking-container').style.display = 'none';
   document.getElementById('home-container').style.display = 'block';
   setActiveScreen('mode');
@@ -1041,12 +1062,26 @@ let lobbyState = {
   arcadeMode: false,
   maxActivePlayers: 2,
   maxSpectators: 10,
-  hostId: null
+  hostId: null,
+  // Noms d'équipe pour les formats en équipes (par défaut "Équipe 1/2").
+  teamNames: { team1: 'Équipe 1', team2: 'Équipe 2' }
 };
 
 // Renvoie la config (avec fallback sur 1v1 si format inconnu).
 function getLobbyFormatConfig(format) {
   return LOBBY_FORMAT_CONFIG[format] || LOBBY_FORMAT_CONFIG['1v1'];
+}
+
+// Renvoie le nom affiché d'une équipe (avec fallback "Équipe N").
+function getTeamDisplayName(teamSlot) {
+  if (!teamSlot) return '';
+  if (lobbyState.teamNames && lobbyState.teamNames[teamSlot]) {
+    return lobbyState.teamNames[teamSlot];
+  }
+  // Fallback : "Équipe 1" / "Équipe 2" basé sur l'index.
+  const cfg = getLobbyFormatConfig(lobbyState.format);
+  const idx = (cfg.teams || []).indexOf(teamSlot);
+  return idx >= 0 ? `Équipe ${idx + 1}` : teamSlot;
 }
 
 // Renvoie le slot du joueur actif courant (utile pour colorer rouge/blanc).
@@ -1056,7 +1091,8 @@ function getMySlot() {
 }
 
 // Construit un chip <div> pour un membre.
-function buildPlayerChip(member, isOpponent, canMove) {
+function buildPlayerChip(member, isOpponent, canMove, opts) {
+  opts = opts || {};
   const chip = document.createElement('div');
   chip.className = 'lobby-player-chip';
   chip.dataset.memberId = member.socketId;
@@ -1078,11 +1114,278 @@ function buildPlayerChip(member, isOpponent, canMove) {
   name.textContent = member.nickname || 'Joueur';
   chip.appendChild(name);
 
+  // Badge score à droite (utilisé pendant un match et sur le panneau game)
+  if (opts.score != null) {
+    chip.classList.add('has-score');
+    const score = document.createElement('span');
+    score.className = 'lobby-player-chip-score';
+    score.dataset.score = '';
+    score.textContent = opts.score;
+    chip.appendChild(score);
+  }
+
   if (canMove) {
     chip.setAttribute('draggable', 'true');
     chip.title = 'Glisse pour changer d\'équipe ou clique pour ouvrir le menu';
   }
   return chip;
+}
+
+/* ================================================================
+   PANNEAU PERMANENT (écran de jeu)
+   ----------------------------------------------------------------
+   Affiché à droite du bloc central pendant tout le duel. Liste les
+   participants actifs (ordre : moi d'abord, puis les autres triés par
+   score décroissant) avec leur pseudo, leur badge score et la couronne
+   d'hôte. Mis à jour à chaque init-game / round-end / game-over.
+   ================================================================ */
+let gameRosterState = {
+  players: [],   // [{id, nickname, isHost}, ...]
+  score:   {}    // {socketId: points}
+};
+
+// Score live du match en cours (utilisé par le panneau du lobby pour afficher
+// le badge score sur chaque chip entre deux manches). Indexé par socket.id.
+// Vidé quand un nouveau match démarre ou quand on quitte le salon.
+let currentMatchScore = {};
+
+function renderGameRoster(data, opts) {
+  opts = opts || {};
+
+  // Liste des containers à remplir : le panneau permanent + un éventuel
+  // classement inline (passé via opts.extraContainer) pour les écrans de
+  // fin de manche / fin de match.
+  const containers = [];
+  const sidePanelZone = document.getElementById('game-roster-zone');
+  if (sidePanelZone) containers.push(sidePanelZone);
+  if (opts.extraContainer) containers.push(opts.extraContainer);
+  if (containers.length === 0) return;
+
+  const players = Array.isArray(data.players) && data.players.length
+    ? data.players.slice()
+    : (gameRosterState.players || []).slice();
+  const score = data.score || gameRosterState.score || {};
+
+  // ====== Branche FORMAT ÉQUIPES (1v2) ======
+  // Le score est indexé par équipe (team1/team2), pas par joueur. On affiche
+  // deux blocs d'équipe avec leur nom + score, puis les chips des membres.
+  const teamMode = isTeamFormatClient(currentGameFormat);
+  if (teamMode) {
+    const myTeam = getMyMatchTeam();
+    const teamOrder = ['team1', 'team2'];
+    teamOrder.sort((a, b) => {
+      if (a === myTeam) return -1;
+      if (b === myTeam) return 1;
+      return 0;
+    });
+
+    // Score AVANT animation (-1 sur le gagnant si une animation est demandée)
+    const beforeScore = { team1: score.team1 || 0, team2: score.team2 || 0 };
+    const animateWinnerId = opts.animateWinnerId || null;
+    if (animateWinnerId && beforeScore[animateWinnerId] != null) {
+      beforeScore[animateWinnerId] = Math.max(0, beforeScore[animateWinnerId] - 1);
+    }
+
+    // Mapping playerTeams local : on s'appuie sur currentPlayerTeams.
+    const teamOf = (pid) => currentPlayerTeams[pid];
+
+    containers.forEach(zone => {
+      zone.innerHTML = '';
+      teamOrder.forEach(teamSlot => {
+        const block = document.createElement('div');
+        block.className = 'game-roster-team-block';
+
+        // Header équipe : nom + score
+        const header = document.createElement('div');
+        header.className = 'lobby-panel-pill lobby-team-header game-roster-team-header';
+        header.dataset.teamSlot = teamSlot;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'lobby-team-header-name';
+        nameSpan.textContent = currentTeamNames[teamSlot] || teamSlot;
+
+        const scoreSpan = document.createElement('span');
+        scoreSpan.className = 'game-roster-team-score';
+        scoreSpan.dataset.score = '';
+        scoreSpan.dataset.memberId = teamSlot; // pour que animateScoreIncrement le retrouve
+        scoreSpan.textContent = beforeScore[teamSlot] || 0;
+
+        header.appendChild(nameSpan);
+        header.appendChild(scoreSpan);
+        block.appendChild(header);
+
+        // Membres de l'équipe (sans score individuel)
+        const teamMembers = players.filter(p => teamOf(p.id) === teamSlot);
+        teamMembers.forEach(p => {
+          const member = {
+            socketId: p.id,
+            nickname: p.nickname,
+            isHost: !!p.isHost
+          };
+          const isOpponent = teamSlot !== myTeam;
+          const chip = buildPlayerChip(member, isOpponent, false, {});
+          block.appendChild(chip);
+        });
+        if (teamMembers.length === 0) {
+          const hint = document.createElement('div');
+          hint.className = 'lobby-team-empty-hint';
+          hint.textContent = '(vide)';
+          block.appendChild(hint);
+        }
+        zone.appendChild(block);
+      });
+    });
+
+    gameRosterState = { players, score };
+
+    if (!animateWinnerId) return;
+
+    // Animer +1 sur le score de l'équipe gagnante (le bloc est ciblé via
+    // data-member-id côté score span, pour réutiliser animateScoreIncrement
+    // ou faire une version inline).
+    const delay = (opts.animateDelay != null) ? opts.animateDelay : 1000;
+    setTimeout(() => {
+      containers.forEach(zone => {
+        const winnerScoreEl = zone.querySelector(
+          `.game-roster-team-score[data-member-id="${animateWinnerId}"]`
+        );
+        if (!winnerScoreEl) return;
+        // Glow sur l'équipe gagnante
+        const headerEl = winnerScoreEl.closest('.lobby-team-header');
+        if (headerEl) {
+          headerEl.classList.add('score-flash');
+          setTimeout(() => headerEl.classList.remove('score-flash'), 900);
+        }
+        // +1 flottant à côté du score
+        const plus = document.createElement('span');
+        plus.className = 'lobby-player-chip-plus-one';
+        plus.textContent = '+1';
+        winnerScoreEl.appendChild(plus);
+        setTimeout(() => { if (plus.parentNode) plus.parentNode.removeChild(plus); }, 1050);
+        // Mise à jour du chiffre
+        setTimeout(() => {
+          winnerScoreEl.firstChild && winnerScoreEl.firstChild.nodeType === 3
+            ? (winnerScoreEl.firstChild.textContent = String(score[animateWinnerId] || 0))
+            : (winnerScoreEl.textContent = String(score[animateWinnerId] || 0));
+          winnerScoreEl.classList.add('score-just-incremented');
+          setTimeout(() => winnerScoreEl.classList.remove('score-just-incremented'), 600);
+        }, 250);
+      });
+    }, delay);
+
+    return;
+  }
+
+  // ====== Branche FORMATS CLASSIQUES (1v1, 1v1v1+) ======
+
+  // Score "d'avant" pour animer un +1 : on soustrait 1 au gagnant
+  const beforeScore = {};
+  players.forEach(p => { beforeScore[p.id] = score[p.id] || 0; });
+  const animateWinnerId = opts.animateWinnerId || null;
+  if (animateWinnerId && beforeScore[animateWinnerId] != null) {
+    beforeScore[animateWinnerId] = Math.max(0, beforeScore[animateWinnerId] - 1);
+  }
+
+  // Tri : score décroissant, égalité tranchée par pseudo (ordre alphabétique).
+  // (Pas de "moi" en haut — le classement reflète strictement les scores,
+  // donc je peux me retrouver en bas si je suis dernier.)
+  const sortFor = scoreMap => (a, b) => {
+    const ds = (scoreMap[b.id] || 0) - (scoreMap[a.id] || 0);
+    if (ds !== 0) return ds;
+    return (a.nickname || '').localeCompare(b.nickname || '');
+  };
+  const initialOrder = players.slice().sort(sortFor(beforeScore));
+
+  // Rendu des chips dans CHAQUE container
+  containers.forEach(zone => {
+    zone.innerHTML = '';
+    initialOrder.forEach(p => {
+      const member = {
+        socketId: p.id,
+        nickname: p.nickname,
+        isHost: !!p.isHost
+      };
+      const isOpponent = (p.id !== socket.id);
+      const chip = buildPlayerChip(member, isOpponent, false, { score: beforeScore[p.id] || 0 });
+      zone.appendChild(chip);
+    });
+  });
+
+  // Mémoriser pour les prochains rendus
+  gameRosterState = { players, score };
+
+  // Pas d'animation demandée → on s'arrête
+  if (!animateWinnerId) return;
+
+  // Animer +1 et replacement éventuel — sur tous les containers (panneau ET inline)
+  const delay = (opts.animateDelay != null) ? opts.animateDelay : 1000;
+  setTimeout(() => {
+    containers.forEach(zone => animateScoreIncrement(zone, players, score, animateWinnerId));
+  }, delay);
+}
+
+// Anime un +1 sur la chip du gagnant + replace les chips selon le nouveau classement.
+function animateScoreIncrement(container, players, finalScore, winnerId) {
+  const rows = Array.from(container.querySelectorAll('.lobby-player-chip'));
+  const winnerRow = rows.find(r => r.dataset.memberId === winnerId);
+  if (!winnerRow) return;
+
+  // "+1" flottant
+  const plus = document.createElement('span');
+  plus.className = 'lobby-player-chip-plus-one';
+  plus.textContent = '+1';
+  winnerRow.appendChild(plus);
+  setTimeout(() => { if (plus.parentNode) plus.parentNode.removeChild(plus); }, 1050);
+
+  // Flash glow sur la ligne du gagnant
+  winnerRow.classList.add('score-flash');
+  setTimeout(() => winnerRow.classList.remove('score-flash'), 900);
+
+  // Mise à jour du chiffre après un petit délai (~ début du flash)
+  setTimeout(() => {
+    const scoreEl = winnerRow.querySelector('[data-score]');
+    if (scoreEl) {
+      scoreEl.textContent = finalScore[winnerId] || 0;
+      scoreEl.classList.add('score-just-incremented');
+      setTimeout(() => scoreEl.classList.remove('score-just-incremented'), 600);
+    }
+  }, 250);
+
+  // Mesurer les positions actuelles (FLIP step 1)
+  const oldPos = new Map();
+  rows.forEach(r => oldPos.set(r.dataset.memberId, r.getBoundingClientRect().top));
+
+  // Calculer le nouvel ordre et le réordonner DANS LE DOM (FLIP step 2)
+  // Tri pur par score décroissant (pas de "moi" en haut).
+  const sortFor = scoreMap => (a, b) => {
+    const ds = (scoreMap[b.id] || 0) - (scoreMap[a.id] || 0);
+    if (ds !== 0) return ds;
+    return (a.nickname || '').localeCompare(b.nickname || '');
+  };
+  const finalOrder = players.slice().sort(sortFor(finalScore));
+
+  setTimeout(() => {
+    finalOrder.forEach(p => {
+      const row = rows.find(r => r.dataset.memberId === p.id);
+      if (row) container.appendChild(row); // ré-insère = déplace
+    });
+
+    // Mesurer les nouvelles positions et "inverser" via transform (FLIP step 3)
+    rows.forEach(r => {
+      const dy = oldPos.get(r.dataset.memberId) - r.getBoundingClientRect().top;
+      if (dy !== 0) {
+        r.style.transition = 'none';
+        r.style.transform = `translateY(${dy}px)`;
+      }
+    });
+
+    // Force un reflow puis "play" : transform → 0 avec transition (FLIP step 4)
+    void container.offsetHeight;
+    rows.forEach(r => {
+      r.style.removeProperty('transition');
+      r.style.transform = '';
+    });
+  }, 400);
 }
 
 // Détermine si le joueur courant peut déplacer ce membre.
@@ -1131,6 +1434,16 @@ function renderLobbyPanel() {
     return true;
   };
 
+  // Helper : renvoie le score d'un membre si un match est en cours, sinon null.
+  // Le score "live" est stocké dans `currentMatchScore` (mis à jour par les
+  // events init-game / round-end / game-over). Les chips affichent un badge
+  // score à droite uniquement quand le match est en cours.
+  const scoreFor = (memberId) => {
+    if (!matchInProgress) return null;
+    if (!currentMatchScore || !(memberId in currentMatchScore)) return null;
+    return currentMatchScore[memberId];
+  };
+
   if (cfg.showTeamHeaders) {
     // Format en équipes : on construit une section par équipe.
     // En mode équipes, la zone joueurs n'est plus un drop-target global :
@@ -1142,23 +1455,49 @@ function renderLobbyPanel() {
     if (mySlot && order.includes(mySlot)) {
       order.sort((a, b) => (a === mySlot ? -1 : (b === mySlot ? 1 : 0)));
     }
-    // Mais on garde les labels "Équipe 1"/"Équipe 2" attachés au slot d'origine.
+    // Mais on garde les labels personnalisés attachés au slot d'origine.
     order.forEach(teamSlot => {
       const block = document.createElement('div');
       block.className = 'lobby-team-block';
       // Tout le bloc d'équipe sert de drop-target (header + chips + empty hint)
       block.dataset.slot = `dropzone-${teamSlot}`;
 
-      // En-tête équipe (style pilule sombre + texte jaune)
+      // En-tête équipe : nom personnalisable (cliquable uniquement par les
+      // membres de cette équipe). Pour les non-membres, c'est juste un label.
       const header = document.createElement('div');
       header.className = 'lobby-panel-pill lobby-team-header';
-      const labelIdx = cfg.teams.indexOf(teamSlot) + 1;
-      header.textContent = `Équipe ${labelIdx}`;
+      header.dataset.teamSlot = teamSlot;
+      const isMember = (mySlot === teamSlot);
+      const displayName = getTeamDisplayName(teamSlot);
+      if (isMember) {
+        header.classList.add('lobby-team-header-editable');
+        header.setAttribute('role', 'button');
+        header.tabIndex = 0;
+        header.setAttribute('aria-label', `Renommer ${displayName}`);
+        header.title = "Clique pour renommer ton équipe";
+      }
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'lobby-team-header-name';
+      nameSpan.textContent = displayName;
+      header.appendChild(nameSpan);
+      if (isMember) {
+        const editHint = document.createElement('span');
+        editHint.className = 'lobby-team-header-edit';
+        editHint.setAttribute('aria-hidden', 'true');
+        editHint.textContent = '✏️';
+        header.appendChild(editHint);
+      }
       block.appendChild(header);
 
-      // Membres de l'équipe (moi en premier si je suis dans cette équipe)
+      // Membres de l'équipe : pendant un match, tri par score (desc) ;
+      // hors match, "moi" en premier puis ordre d'insertion.
       const teamMembers = active.filter(m => m.slot === teamSlot);
       teamMembers.sort((a, b) => {
+        if (matchInProgress) {
+          const ds = (scoreFor(b.socketId) || 0) - (scoreFor(a.socketId) || 0);
+          if (ds !== 0) return ds;
+          return (a.nickname || '').localeCompare(b.nickname || '');
+        }
         if (a.socketId === socket.id) return -1;
         if (b.socketId === socket.id) return 1;
         return 0;
@@ -1172,7 +1511,10 @@ function renderLobbyPanel() {
         block.classList.add('lobby-team-block-empty');
       } else {
         teamMembers.forEach(m => {
-          block.appendChild(buildPlayerChip(m, isOpponentOf(m), canMoveMember(m.socketId)));
+          const opts = {};
+          const sc = scoreFor(m.socketId);
+          if (sc != null) opts.score = sc;
+          block.appendChild(buildPlayerChip(m, isOpponentOf(m), canMoveMember(m.socketId), opts));
         });
       }
       playersZone.appendChild(block);
@@ -1182,14 +1524,23 @@ function renderLobbyPanel() {
     // La zone entière devient un drop-target pour revenir actif.
     playersZone.dataset.slot = `dropzone-${cfg.teams[0]}`;
 
-    // Mon pseudo en premier, puis les autres.
+    // Tri : pendant un match, par score (desc) — j'apparais à ma vraie place
+    // au classement, même tout en bas. Hors match : "moi" en premier.
     const sorted = active.slice().sort((a, b) => {
+      if (matchInProgress) {
+        const ds = (scoreFor(b.socketId) || 0) - (scoreFor(a.socketId) || 0);
+        if (ds !== 0) return ds;
+        return (a.nickname || '').localeCompare(b.nickname || '');
+      }
       if (a.socketId === socket.id) return -1;
       if (b.socketId === socket.id) return 1;
       return 0;
     });
     sorted.forEach(m => {
-      playersZone.appendChild(buildPlayerChip(m, isOpponentOf(m), canMoveMember(m.socketId)));
+      const opts = {};
+      const sc = scoreFor(m.socketId);
+      if (sc != null) opts.score = sc;
+      playersZone.appendChild(buildPlayerChip(m, isOpponentOf(m), canMoveMember(m.socketId), opts));
     });
   }
 
@@ -1199,11 +1550,78 @@ function renderLobbyPanel() {
     specList.appendChild(buildPlayerChip(m, false, canMoveMember(m.socketId)));
   });
 
-  // 6) Sync du bouton "LANCER LE DUEL" — en 1v1 il faut 2 joueurs actifs
+  // 6) Sync du bouton "LANCER LE DUEL"
+  //   • 1v1 : il faut 2 joueurs actifs.
+  //   • 1v2 (équipes) : il faut au moins 1 joueur dans CHAQUE équipe.
   const startBtn = document.getElementById('btn-start-custom');
   if (startBtn && lobbyState.format === '1v1') {
     startBtn.disabled = active.length < 2;
+  } else if (startBtn && cfg.showTeamHeaders) {
+    const teamCounts = {};
+    cfg.teams.forEach(t => { teamCounts[t] = 0; });
+    active.forEach(m => {
+      if (m.slot in teamCounts) teamCounts[m.slot]++;
+    });
+    const allTeamsHaveOne = cfg.teams.every(t => teamCounts[t] >= 1);
+    startBtn.disabled = !allTeamsHaveOne;
   }
+}
+
+// === Édition inline du nom d'équipe (1v2) ===
+// Au clic sur l'en-tête d'une équipe DONT JE SUIS MEMBRE, on remplace le
+// libellé par un <input> pré-rempli. La sauvegarde se fait à la validation
+// (Entrée ou perte de focus). Échap annule.
+function startTeamRenameInline(headerEl) {
+  if (!headerEl || headerEl.classList.contains('lobby-team-renaming')) return;
+  const teamSlot = headerEl.dataset.teamSlot;
+  if (!teamSlot) return;
+  // Double sécurité côté client : on ne lance l'édition que si on est membre
+  // (le serveur fera de toute façon la vérification définitive).
+  const mySlot = getMySlot();
+  if (mySlot !== teamSlot) return;
+
+  headerEl.classList.add('lobby-team-renaming');
+  const currentName = getTeamDisplayName(teamSlot);
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'lobby-team-header-input';
+  input.value = currentName;
+  input.maxLength = 24;
+  input.setAttribute('aria-label', 'Nouveau nom de l\'équipe');
+
+  // On vide le contenu actuel (label + crayon) et on insère l'input.
+  headerEl.innerHTML = '';
+  headerEl.appendChild(input);
+
+  let committed = false;
+  const commit = (save) => {
+    if (committed) return;
+    committed = true;
+    const newName = (input.value || '').trim();
+    if (save && newName && newName !== currentName && myRoomCode) {
+      socket.emit('lobby-team-rename', {
+        code: myRoomCode,
+        teamSlot,
+        newName
+      });
+    }
+    // Dans tous les cas on relâche : un broadcast lobby-state du serveur
+    // viendra reconstruire le panneau avec le nom à jour (ou pas, si l'édition
+    // a été annulée / refusée). On reconstruit déjà localement pour ne pas
+    // laisser l'input zombie en cas d'absence de broadcast (annulation).
+    headerEl.classList.remove('lobby-team-renaming');
+    renderLobbyPanel();
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+  });
+  input.addEventListener('blur', () => commit(true));
+
+  // Sélection complète pour que l'utilisateur tape directement par-dessus.
+  setTimeout(() => { input.focus(); input.select(); }, 0);
 }
 
 // === Spectateurs : repli/déploiement ===
@@ -1360,6 +1778,16 @@ function openLobbyActionMenu(chip) {
 
 if (lobbyPanel) {
   lobbyPanel.addEventListener('click', (e) => {
+    // Clic sur l'en-tête d'une équipe → ouvre l'édition inline si membre.
+    // On gère ça AVANT le clic chip, et on tolère le clic sur le crayon.
+    const teamHeader = e.target.closest('.lobby-team-header-editable');
+    if (teamHeader) {
+      // Ignorer les clics qui sortent du header (sécurité)
+      e.stopPropagation();
+      startTeamRenameInline(teamHeader);
+      return;
+    }
+
     const chip = e.target.closest('.lobby-player-chip');
     if (!chip) return;
     // Sur le bouton de repli des spectateurs, ne pas réagir
@@ -1379,7 +1807,11 @@ socket.on('lobby-state', payload => {
     arcadeMode: !!payload.arcadeMode,
     maxActivePlayers: payload.maxActivePlayers || 2,
     maxSpectators: payload.maxSpectators || 10,
-    hostId: payload.hostId || null
+    hostId: payload.hostId || null,
+    teamNames: Object.assign(
+      { team1: 'Équipe 1', team2: 'Équipe 2' },
+      payload.teamNames || {}
+    )
   };
   renderLobbyPanel();
 });
@@ -1599,9 +2031,95 @@ const THEME_HINTS = {
   quizcinema: "Des questions sur le cinéma vont s'enchaîner, trouve la bonne réponse !",
 };
 
+// =====================================================================
+// MATCHMAKING – Écran VS : countdown 5s avant le duel + bouton « Reroll »
+// ---------------------------------------------------------------------
+// Chaque joueur a 3 rerolls par fenêtre glissante de 24h. À chaque reroll
+// d'un des deux joueurs, le thème change et le countdown repart à 5s
+// pour les deux côtés. Tout est piloté par le serveur ; le client ne fait
+// que refléter l'état reçu et programmer l'émission de `matchmaking-ready`
+// à l'expiration du délai.
+// =====================================================================
+const MATCH_VS_DEFAULT_DELAY_MS = 5000;
+let vsCountdownInterval = null;
+let vsReadyTimeout = null;
+let vsCurrentRoomCode = null;
+let vsMatchStartAfter = 0;
+let vsMyRerolls = { available: 3, nextUnlockMs: 0 };
+
+/** Formate un nombre de ms en "Xh Ym" (ou "Xm" si < 1h, ou "<1m"). */
+function formatRerollCooldown(ms) {
+  if (ms <= 0) return '';
+  const totalMin = Math.ceil(ms / 60000);
+  if (totalMin < 1) return '<1m';
+  if (totalMin < 60) return totalMin + 'm';
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+/** Met à jour l'affichage du bouton reroll selon l'état reçu du serveur. */
+function updateRerollButton(state) {
+  if (state && typeof state.available === 'number') vsMyRerolls = state;
+  const btn      = document.getElementById('btn-reroll-theme');
+  const badge    = document.getElementById('reroll-badge');
+  const cooldown = document.getElementById('reroll-cooldown');
+  if (!btn || !badge || !cooldown) return;
+
+  const { available, nextUnlockMs } = vsMyRerolls;
+  badge.textContent = `${available}/3`;
+
+  if (available > 0) {
+    btn.disabled = false;
+    btn.title = `${available} reroll${available > 1 ? 's' : ''} restant${available > 1 ? 's' : ''} sur 24h`;
+    cooldown.textContent = '';
+  } else {
+    btn.disabled = true;
+    const txt = formatRerollCooldown(nextUnlockMs);
+    btn.title = txt
+      ? `Reroll épuisé — prochain dans ${txt}`
+      : 'Reroll épuisé pour 24h';
+    cooldown.textContent = txt;
+  }
+}
+
+/** Nettoie tous les timers liés à l'écran VS. */
+function clearVsTimers() {
+  if (vsCountdownInterval) { clearInterval(vsCountdownInterval); vsCountdownInterval = null; }
+  if (vsReadyTimeout)      { clearTimeout(vsReadyTimeout);      vsReadyTimeout = null; }
+}
+
+/** Lance / relance le countdown affiché en bas de l'écran VS. */
+function startVsCountdown() {
+  clearVsTimers();
+  const counterEl = document.getElementById('match-start-counter');
+  const updateCounter = () => {
+    const remaining = Math.max(0, vsMatchStartAfter - Date.now());
+    const secs = Math.ceil(remaining / 1000);
+    if (counterEl) counterEl.textContent = remaining > 0 ? `(${secs})` : '';
+    if (remaining <= 0 && vsCountdownInterval) {
+      clearInterval(vsCountdownInterval);
+      vsCountdownInterval = null;
+    }
+  };
+  updateCounter();
+  vsCountdownInterval = setInterval(updateCounter, 200);
+
+  // Seul le joueur "qui commence" déclenche le démarrage côté serveur, mais on
+  // arme un timeout côté client à la fin du délai. Le serveur ignorera l'event
+  // s'il vient trop tôt — pas de risque.
+  const delay = Math.max(0, vsMatchStartAfter - Date.now());
+  vsReadyTimeout = setTimeout(() => {
+    if (vsCurrentRoomCode) {
+      socket.emit('matchmaking-ready', { code: vsCurrentRoomCode });
+    }
+  }, delay);
+}
+
 // Match trouvé en matchmaking : afficher l'écran VS et lancer le compte à rebours
 socket.on('match-found', data => {
   myRoomCode = data.roomCode;
+  vsCurrentRoomCode = data.roomCode;
 
   // Affiche l'écran "VS" dans le container matchmaking
   document.getElementById('queue-status').style.display = 'none';
@@ -1622,21 +2140,84 @@ socket.on('match-found', data => {
   const hintEl = document.getElementById('match-hint');
   if (hintEl) hintEl.textContent = THEME_HINTS[data.theme] || '';
 
-  console.log('Match trouvé !', data);
+  // Quotas de reroll + délai d'affichage VS (fournis par le serveur, avec fallback)
+  vsMatchStartAfter = data.matchStartAfter || (Date.now() + (data.matchStartDelayMs || MATCH_VS_DEFAULT_DELAY_MS));
+  updateRerollButton(data.myRerolls || { available: 3, nextUnlockMs: 0 });
+  startVsCountdown();
 
-  // Après 3 secondes, on signale au serveur qu'on est prêt → il lance le match
-  setTimeout(() => {
-    socket.emit('matchmaking-ready', { code: data.roomCode });
-  }, 3000);
+  console.log('Match trouvé !', data);
 });
 
+// Le thème vient d'être rerollé (par moi ou par l'adversaire) :
+// on resynchronise l'affichage et on remet le countdown à 5s.
+socket.on('theme-rerolled', data => {
+  const themeEl = document.getElementById('match-theme');
+  const hintEl  = document.getElementById('match-hint');
+  if (themeEl) {
+    themeEl.textContent = THEME_LABELS[data.theme] || data.theme;
+    themeEl.classList.remove('is-swapping');
+    // Force un reflow pour redémarrer l'animation à chaque reroll
+    // eslint-disable-next-line no-unused-expressions
+    void themeEl.offsetWidth;
+    themeEl.classList.add('is-swapping');
+  }
+  if (hintEl) hintEl.textContent = THEME_HINTS[data.theme] || '';
+
+  vsMatchStartAfter = data.matchStartAfter || (Date.now() + (data.matchStartDelayMs || MATCH_VS_DEFAULT_DELAY_MS));
+  if (data.myRerolls) updateRerollButton(data.myRerolls);
+  startVsCountdown();
+});
+
+// Le serveur refuse le reroll (quota déjà épuisé côté serveur) : on resync.
+socket.on('reroll-denied', data => {
+  if (data && data.myRerolls) updateRerollButton(data.myRerolls);
+  // Stoppe l'éventuelle animation en cours sur le bouton
+  const btn = document.getElementById('btn-reroll-theme');
+  if (btn) btn.classList.remove('is-rerolling');
+});
+
+// Clic sur le bouton "Reroll" : on déclenche l'animation et on émet au serveur.
+// La mise à jour effective du thème viendra de `theme-rerolled` (autorité serveur).
+(() => {
+  const btn = document.getElementById('btn-reroll-theme');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return;
+    if (!vsCurrentRoomCode) return;
+    if (vsMyRerolls.available <= 0) return;
+
+    // Animation locale immédiate (feedback)
+    btn.classList.remove('is-rerolling');
+    // eslint-disable-next-line no-unused-expressions
+    void btn.offsetWidth;
+    btn.classList.add('is-rerolling');
+    setTimeout(() => btn.classList.remove('is-rerolling'), 600);
+
+    // On désactive le bouton tout de suite pour éviter le double-clic ;
+    // l'état réel reviendra via `theme-rerolled`.
+    btn.disabled = true;
+
+    socket.emit('reroll-theme', { code: vsCurrentRoomCode });
+  });
+})();
+
 socket.on('init-game', data => {
+  // L'écran VS du matchmaking a fait son office : on coupe ses timers/animations
+  // pour repartir propre dans le duel (et éviter qu'un setTimeout réémette
+  // matchmaking-ready alors qu'on est déjà en jeu).
+  clearVsTimers();
+  vsCurrentRoomCode = null;
+  const counterEl = document.getElementById('match-start-counter');
+  if (counterEl) counterEl.textContent = '';
+
   // On mémorise l'état du match avant la transition. Ainsi, si le joueur clique
   // sur "Retour" pendant le 3-2-1, le lobby peut déjà afficher Manche X/X + score.
   currentMode = data.mode || currentMode;
   currentMatchRounds = data.rounds || 1;
   matchHistory = data.matchHistory || [];
   matchInProgress = currentMatchRounds > 1;
+  // Nouvelle manche : on n'est plus éliminé (tous les chronos sont réinitialisés)
+  iAmEliminatedThisRound = false;
   updateMatchAnswers(data);
 
   if (data.avatars) {
@@ -1648,7 +2229,10 @@ socket.on('init-game', data => {
 
   // On enchaîne d'abord par l'écran de transition (3-2-1), puis on affiche le duel.
   runIntroTransition(currentMode, () => {
-    document.getElementById('game-container').style.display = 'block';
+    // 'flex' (et non 'block') car #game-container est un flex container :
+    // le bloc central et le panneau latéral classement sont des items flex
+    // côte à côte. Un display:block les empile verticalement.
+    document.getElementById('game-container').style.display = 'flex';
     setActiveScreen('game');
     currentMode = data.mode;
 
@@ -1671,9 +2255,18 @@ socket.on('init-game', data => {
     currentMatchRounds = data.rounds || 1;
     matchHistory = data.matchHistory || [];
     updateMatchScore(matchHistory);
-    showScoreBlock('game-score-block', currentMatchRounds > 1);
     updateMatchRoundLabel(data.currentRound || 1, data.rounds || 1);
 
+    // === Setup du scoreboard selon le format ===
+    setupScoreboard(data);
+
+    // === Panneau classement permanent à droite ===
+    // Affiché pour tous les formats (1v1, 1v1v1, …) et tous les modes
+    // (privé, matchmaking). Le panneau reste visible pendant toute la partie.
+    renderGameRoster(data);
+
+    // Mémoriser le score live pour le panneau du lobby (utilisé entre manches).
+    currentMatchScore = Object.assign({}, data.score || {});
     const hintMessages = {
       athletes: 'Les accents ne sont pas nécessaires<br>Tapez uniquement les noms de famille !',
       stades: 'Les accents ne sont pas nécessaires<br>Le nom du stade le plus populaire est attendu.',
@@ -1724,7 +2317,7 @@ socket.on('init-game', data => {
 
     displayQuestion(data.question, currentMode);
 
-    if (data.activePlayerId === socket.id) {
+    if (isMyTurn(data.activePlayerId)) {
       answerInput.disabled = false;
       answerInput.style.opacity = 1;
       answerInput.placeholder = 'Tape ta réponse ici...';
@@ -1735,7 +2328,7 @@ socket.on('init-game', data => {
     } else {
       answerInput.disabled = true;
       answerInput.style.opacity = 0.5;
-      answerInput.placeholder = "Au tour de l'adversaire...";
+      answerInput.placeholder = getWaitingPlaceholder(data.activePlayerId);
       answerInput.value = '';
       passBtn.disabled = true;
       passBtn.style.opacity = 0.5;
@@ -1745,6 +2338,265 @@ socket.on('init-game', data => {
     syncTimer(data.times, data.activePlayerId, { resetMax: true });
   }); // fin du callback runIntroTransition
 });
+
+/* ================================================================
+   SCOREBOARD MULTI-JOUEURS (formats arcade 1v1v1+)
+   ----------------------------------------------------------------
+   Pour le format '1v1' on garde les deux pastilles HTML statiques.
+   Pour les formats à 3+ joueurs, on remplace dynamiquement le contenu
+   de #scoreboard par N pastilles. Chaque pastille porte
+   data-player-pill + data-player-id pour que renderTimerFrame() pioche
+   automatiquement le bon chrono. La couleur active (orange) est gérée
+   par la classe .pill-is-active basculée à chaque next-round.
+   ================================================================ */
+let currentGameFormat = '1v1';
+let gamePlayers = []; // [{id, nickname, isHost}, ...] dans l'ordre de jeu
+
+// État spécifique aux formats en équipes (1v2) : noms d'équipes & mapping
+// socketId → slot. Mis à jour à chaque init-game / round-end / game-over.
+let currentTeamNames = { team1: 'Équipe 1', team2: 'Équipe 2' };
+let currentPlayerTeams = {}; // socketId → 'team1' | 'team2'
+
+function isTeamFormatClient(format) {
+  return format === '1v2';
+}
+
+// Renvoie le slot d'équipe du joueur courant pour la partie EN COURS.
+// Pendant un match, on s'appuie sur le snapshot envoyé par le serveur dans
+// init-game (currentPlayerTeams) plutôt que sur lobbyState, qui pourrait
+// avoir bougé entre-temps.
+function getMyMatchTeam() {
+  return currentPlayerTeams[socket.id] || null;
+}
+
+// Renvoie true si c'est à moi de répondre, compte tenu du format actif.
+//   • 1v1 / 1v1v1+ : activePlayerId === socket.id
+//   • 1v2 (équipes) : mon slot d'équipe === activePlayerId
+function isMyTurn(activePlayerId) {
+  if (!activePlayerId) return false;
+  if (isTeamFormatClient(currentGameFormat)) {
+    return getMyMatchTeam() === activePlayerId;
+  }
+  return activePlayerId === socket.id;
+}
+
+// Renvoie le texte d'attente affiché quand ce n'est pas mon tour.
+// Adapté au format pour ne pas dire "adversaire" si c'est mon coéquipier.
+function getWaitingPlaceholder(activePlayerId) {
+  if (iAmEliminatedThisRound) return 'Tu es éliminé de la manche.';
+  if (isTeamFormatClient(currentGameFormat)) {
+    // L'équipe active n'est pas la mienne → c'est à l'équipe adverse.
+    const teamName = currentTeamNames[activePlayerId] || 'Équipe adverse';
+    return `Au tour de ${teamName}...`;
+  }
+  return "Au tour de l'adversaire...";
+}
+
+function setupScoreboard(data) {
+  currentGameFormat = data.format || '1v1';
+  gamePlayers = Array.isArray(data.players) && data.players.length
+    ? data.players.slice()
+    : [];
+
+  // Mémoriser les infos d'équipe envoyées par le serveur
+  if (data.teamNames) {
+    currentTeamNames = Object.assign(
+      { team1: 'Équipe 1', team2: 'Équipe 2' },
+      data.teamNames
+    );
+  }
+  if (data.playerTeams) {
+    currentPlayerTeams = Object.assign({}, data.playerTeams);
+  }
+
+  const scoreboard = document.getElementById('scoreboard');
+  if (!scoreboard) return;
+
+  if (currentGameFormat === '1v1') {
+    // ---- Format historique : on remet en place les deux pastilles HTML
+    // statiques si jamais elles avaient été remplacées par un précédent match.
+    restoreStaticScoreboard();
+
+    // Marquer chaque pastille avec l'ID du joueur correspondant pour que
+    // renderTimerFrame() puisse interpoler le bon chrono.
+    const meEl = document.getElementById('player-pill-me');
+    const oppEl = document.getElementById('player-pill-opp');
+    let oppId = null;
+    for (const id in (data.times || {})) {
+      if (id !== socket.id) { oppId = id; break; }
+    }
+    if (meEl) meEl.setAttribute('data-player-id', socket.id);
+    if (oppEl && oppId) oppEl.setAttribute('data-player-id', oppId);
+
+    setActivePill(data.activePlayerId);
+    return;
+  }
+
+  // ---- Format en ÉQUIPES (1v2) : 2 pastilles, une par équipe ----
+  // Chaque pastille porte le slot d'équipe ('team1'/'team2') comme data-player-id
+  // pour rester compatible avec la boucle d'animation existante (qui pioche
+  // les temps dans state.times indexés par cette même clé).
+  if (isTeamFormatClient(currentGameFormat)) {
+    scoreboard.classList.add('scoreboard-multi');
+    scoreboard.innerHTML = '';
+
+    const myTeam = getMyMatchTeam();
+    // Ordre d'affichage : mon équipe d'abord, puis l'autre.
+    const teamOrder = Array.isArray(data.playOrder) && data.playOrder.length
+      ? data.playOrder.slice()
+      : ['team1', 'team2'];
+    teamOrder.sort((a, b) => {
+      if (a === myTeam) return -1;
+      if (b === myTeam) return 1;
+      return 0;
+    });
+
+    teamOrder.forEach(teamSlot => {
+      const pill = document.createElement('div');
+      pill.className = 'player player-multi player-team';
+      pill.setAttribute('data-player-pill', '');
+      pill.setAttribute('data-player-id', teamSlot);
+      if (teamSlot === myTeam) pill.classList.add('player-multi-me');
+
+      const label = currentTeamNames[teamSlot] || teamSlot;
+      pill.innerHTML = `
+        <div class="timer-bar timer-green" data-timer-bar></div>
+        <span class="timer-label" data-timer-label>${escapeHTML(label)}</span>
+        <span class="timer-value">
+          <span class="tv-secs" data-timer-secs>${Math.floor(data.times[teamSlot] || 0)}</span><span class="tv-sep">:</span><span class="tv-centis" data-timer-centis>00</span><span class="timer-unit">s</span>
+        </span>`;
+      scoreboard.appendChild(pill);
+    });
+
+    setActivePill(data.activePlayerId);
+    return;
+  }
+
+  // ---- Format multi-joueurs (1v1v1+) : une pastille par joueur ----
+  scoreboard.classList.add('scoreboard-multi');
+  scoreboard.innerHTML = '';
+
+  // Ordre d'affichage : ma pastille d'abord, puis les autres dans l'ordre de playOrder
+  const order = (Array.isArray(data.playOrder) && data.playOrder.length)
+    ? data.playOrder.slice()
+    : gamePlayers.map(p => p.id);
+  order.sort((a, b) => {
+    if (a === socket.id) return -1;
+    if (b === socket.id) return 1;
+    return 0;
+  });
+
+  order.forEach(playerId => {
+    const meta = gamePlayers.find(p => p.id === playerId) || { id: playerId, nickname: 'Joueur' };
+    const pill = document.createElement('div');
+    pill.className = 'player player-multi';
+    pill.setAttribute('data-player-pill', '');
+    pill.setAttribute('data-player-id', playerId);
+    if (playerId === socket.id) pill.classList.add('player-multi-me');
+
+    const isMe = playerId === socket.id;
+    const label = isMe ? 'Toi' : (meta.nickname || 'Joueur');
+
+    pill.innerHTML = `
+      <div class="timer-bar timer-green" data-timer-bar></div>
+      <span class="timer-label" data-timer-label>${escapeHTML(label)}</span>
+      <span class="timer-value">
+        <span class="tv-secs" data-timer-secs>${Math.floor(data.times[playerId] || 0)}</span><span class="tv-sep">:</span><span class="tv-centis" data-timer-centis>00</span><span class="timer-unit">s</span>
+      </span>`;
+    scoreboard.appendChild(pill);
+  });
+
+  setActivePill(data.activePlayerId);
+}
+
+// Rétablit le HTML "statique" original des deux pastilles 1v1 si la structure
+// a été remplacée par un match multi-joueurs précédent.
+function restoreStaticScoreboard() {
+  const scoreboard = document.getElementById('scoreboard');
+  if (!scoreboard) return;
+  if (!scoreboard.classList.contains('scoreboard-multi')) return;
+  scoreboard.classList.remove('scoreboard-multi');
+  scoreboard.innerHTML = `
+    <div class="player player-me" id="player-pill-me" data-player-pill data-pill-role="me">
+      <div class="timer-bar timer-bar-me timer-green" id="timer-bar-me" data-timer-bar></div>
+      <span class="timer-label" data-timer-label>Toi</span>
+      <span class="timer-value">
+        <span class="tv-secs" id="my-time-secs" data-timer-secs>45</span><span class="tv-sep">:</span><span class="tv-centis" id="my-time-centis" data-timer-centis>00</span><span class="timer-unit">s</span>
+      </span>
+    </div>
+    <div class="player player-opp" id="player-pill-opp" data-player-pill data-pill-role="opp">
+      <div class="timer-bar timer-bar-opp timer-green" id="timer-bar-opp" data-timer-bar></div>
+      <span class="timer-value">
+        <span class="tv-secs" id="opp-time-secs" data-timer-secs>45</span><span class="tv-sep">:</span><span class="tv-centis" id="opp-time-centis" data-timer-centis>00</span><span class="timer-unit">s</span>
+      </span>
+      <span class="timer-label" data-timer-label>Adversaire</span>
+    </div>`;
+}
+
+// Active visuellement la pastille du joueur dont c'est le tour.
+function setActivePill(activeId) {
+  document.querySelectorAll('#scoreboard [data-player-pill]').forEach(p => {
+    p.classList.toggle('pill-is-active', p.getAttribute('data-player-id') === activeId);
+  });
+}
+
+// Reçu en 1v1v1+ quand un joueur épuise son chrono mais qu'il reste >1 joueur.
+// La pastille du joueur éliminé disparaît, le suivant prend la main.
+socket.on('player-eliminated', data => {
+  if (!data) return;
+  updateMatchAnswers(data);
+
+  // Mémoriser que c'est moi qui viens d'être éliminé de cette manche.
+  // Le placeholder ci-dessous (et ceux des handlers suivants) s'adaptera.
+  if (data.eliminatedPlayerId === socket.id) {
+    iAmEliminatedThisRound = true;
+  }
+
+  // Faire disparaître la pastille du joueur éliminé (animation CSS).
+  const elimPill = document.querySelector(
+    `#scoreboard [data-player-pill][data-player-id="${cssEscape(data.eliminatedPlayerId)}"]`
+  );
+  if (elimPill) {
+    elimPill.classList.add('pill-eliminated');
+    // Retrait après l'animation pour que le layout se réarrange.
+    setTimeout(() => { if (elimPill && elimPill.parentNode) elimPill.parentNode.removeChild(elimPill); }, 480);
+  }
+
+  // Question suivante (le serveur a fait avancer l'index)
+  if (data.nextQuestion) displayQuestion(data.nextQuestion, currentMode);
+
+  // Bascule du chrono sur le nouveau joueur actif
+  if (data.times) syncTimer(data.times, data.activePlayerId);
+  setActivePill(data.activePlayerId);
+
+  // Activer/désactiver les contrôles selon que c'est mon tour
+  if (isMyTurn(data.activePlayerId)) {
+    // (Cas théorique en pratique impossible si je viens d'être éliminé :
+    // si eliminatedPlayerId === socket.id, alors activePlayerId ne peut pas être moi.)
+    answerInput.disabled = false;
+    answerInput.style.opacity = 1;
+    answerInput.placeholder = 'Tape ta réponse ici...';
+    answerInput.value = '';
+    answerInput.focus();
+    passBtn.disabled = false;
+    passBtn.style.opacity = 1;
+  } else {
+    answerInput.disabled = true;
+    answerInput.style.opacity = 0.5;
+    answerInput.placeholder = iAmEliminatedThisRound
+      ? 'Tu es éliminé de la manche.'
+      : 'En attente du prochain joueur...';
+    answerInput.value = '';
+    passBtn.disabled = true;
+    passBtn.style.opacity = 0.5;
+  }
+});
+
+// Petit helper d'échappement CSS (les socketId contiennent parfois des "." et ":")
+function cssEscape(str) {
+  if (window.CSS && CSS.escape) return CSS.escape(str);
+  return String(str).replace(/([.:[\]\\])/g, '\\$1');
+}
 
 function displayQuestion(question, mode) {
   if (!question) return;
@@ -1805,8 +2657,9 @@ socket.on('next-round', data => {
   // Bascule du chrono sur le nouveau joueur actif (les temps ne sont pas
   // remis à zéro : on continue dans la même manche, pas de resetMax).
   if (data.times) syncTimer(data.times, data.activePlayerId);
+  setActivePill(data.activePlayerId);
 
-  if (data.activePlayerId === socket.id) {
+  if (isMyTurn(data.activePlayerId)) {
     answerInput.disabled = false;
     answerInput.style.opacity = 1;
     answerInput.placeholder = 'Tape ta réponse ici...';
@@ -1816,7 +2669,7 @@ socket.on('next-round', data => {
   } else {
     answerInput.disabled = true;
     answerInput.style.opacity = 0.5;
-    answerInput.placeholder = "Au tour de l'adversaire...";
+    answerInput.placeholder = getWaitingPlaceholder(data.activePlayerId);
     passBtn.disabled = true;
     passBtn.style.opacity = 0.5;
   }
@@ -1849,12 +2702,23 @@ passBtn.addEventListener('click', () => {
 
 // Met à jour les chiffres du score dans les deux écrans à partir
 // de l'historique des manches (array de winnerId).
+// Met à jour les chiffres du score dans les deux écrans à partir
+// de l'historique des manches (array de winnerId).
+// En 1v2, winnerId est un slot d'équipe ('team1' / 'team2'). On compte
+// alors les wins de MON équipe vs l'équipe adverse.
 function updateMatchScore(history) {
   let meWins = 0, oppWins = 0;
+  const teamMode = isTeamFormatClient(currentGameFormat);
+  const myTeam = teamMode ? getMyMatchTeam() : null;
   if (Array.isArray(history)) {
     history.forEach(wId => {
-      if (wId === socket.id) meWins++;
-      else oppWins++;
+      if (teamMode) {
+        if (wId === myTeam) meWins++;
+        else oppWins++;
+      } else {
+        if (wId === socket.id) meWins++;
+        else oppWins++;
+      }
     });
   }
   ['game-score-me', 'lobby-score-me'].forEach(id => {
@@ -1941,6 +2805,17 @@ function resetLobbyMatchStatus() {
 // === round-end : afficher le résultat 2s, puis attendre return-to-lobby ===
 socket.on('round-end', data => {
   matchHistory = data.matchHistory || [];
+  // Rafraîchir les infos d'équipe si le serveur en envoie (utile pour
+  // afficher correctement "Manche remportée!" en 1v2).
+  if (data.teamNames) {
+    currentTeamNames = Object.assign(
+      { team1: 'Équipe 1', team2: 'Équipe 2' },
+      data.teamNames
+    );
+  }
+  if (data.playerTeams) {
+    currentPlayerTeams = Object.assign({}, data.playerTeams);
+  }
   updateMatchAnswers(data);
   updateMatchScore(matchHistory);
 
@@ -1955,21 +2830,33 @@ socket.on('round-end', data => {
   document.querySelector('.hint-text').style.display = 'none';
   document.getElementById('input-area').style.display = 'none';
   document.getElementById('scoreboard').style.display = 'none';
-  // On masque uniquement le score de match placé dans le coin du duel.
-  // Les chiffres de #round-transition-score restent affichés dans l'écran de résultat.
-  showScoreBlock('game-score-block', false);
   document.querySelector('#game-container .game-logo')?.closest('.match-header')?.style.setProperty('display', 'none');
+  document.getElementById('game-players-panel').style.display = 'none';
 
-  // Afficher le résultat de la manche
-  const iWon = data.roundWinnerId === socket.id;
+  // Afficher le résultat de la manche.
+  // En 1v2, on compare roundWinnerId à MON équipe et pas à mon socket.id.
+  const teamMode = isTeamFormatClient(currentGameFormat);
+  const iWon = teamMode
+    ? (data.roundWinnerId === getMyMatchTeam())
+    : (data.roundWinnerId === socket.id);
   const result = document.getElementById('round-transition-result');
-  const scoreMe = document.getElementById('round-transition-score-me');
-  const scoreOpp = document.getElementById('round-transition-score-opp');
-
   result.innerText = iWon ? 'Manche remportée !' : 'Manche perdue';
   result.style.color = iWon ? '#4dd0e1' : '#e94560';
-  scoreMe.innerText = data.score[socket.id] || 0;
-  scoreOpp.innerText = (currentOpponentId && data.score[currentOpponentId]) || 0;
+
+  // Animation +1 et replacement sur le panneau permanent ET sur le classement
+  // affiché au centre du bloc principal (sous le titre "Manche perdue/remportée").
+  if (data.roundWinnerId) {
+    renderGameRoster(data, {
+      animateWinnerId: data.roundWinnerId,
+      animateDelay: 1000,
+      extraContainer: document.getElementById('round-multi-leaderboard')
+    });
+  }
+
+  // Mettre à jour le score live pour le panneau du lobby (qui s'affichera
+  // après return-to-lobby). Le panneau lobby ne fait pas d'animation : il
+  // reflète directement le score final.
+  if (data.score) currentMatchScore = Object.assign({}, data.score);
 
   document.getElementById('round-transition-screen').style.display = 'block';
 });
@@ -1980,6 +2867,9 @@ socket.on('return-to-lobby', data => {
   currentMatchRounds = data.rounds || currentMatchRounds || 1;
   matchInProgress = currentMatchRounds > 1;
   updateMatchAnswers(data);
+
+  // Mettre à jour le score live pour le panneau du lobby
+  if (data.score) currentMatchScore = Object.assign({}, data.score);
 
   // Nettoyer l'UI de jeu (sans réinitialiser l'état du match)
   document.getElementById('round-transition-screen').style.display = 'none';
@@ -1994,11 +2884,17 @@ socket.on('return-to-lobby', data => {
   });
 
   returnToLobbyUI();
+
+  // Re-rendre le panneau du lobby pour qu'il affiche les nouveaux scores
+  // (badges score à droite de chaque chip joueur).
+  renderLobbyPanel();
 });
 
 // === round-start : manche suivante en matchmaking (relance automatique) ===
 socket.on('round-start', data => {
   matchHistory = data.matchHistory || [];
+  // Nouvelle manche : on n'est plus éliminé (tous les chronos sont réinitialisés)
+  iAmEliminatedThisRound = false;
   updateMatchAnswers(data);
 
   // Cacher l'écran de résultat
@@ -2010,6 +2906,7 @@ socket.on('round-start', data => {
   document.querySelector('.hint-text').style.display = '';
   document.getElementById('input-area').style.display = '';
   document.getElementById('scoreboard').style.display = '';
+  document.getElementById('game-players-panel').style.display = '';
 
   // Réinitialiser les humeurs d'avatars
   //   window.Avatar.setState(gameAvatarMe, null);
@@ -2029,7 +2926,7 @@ socket.on('round-start', data => {
   }
 
   // Setup input selon qui commence la manche
-  if (data.activePlayerId === socket.id) {
+  if (isMyTurn(data.activePlayerId)) {
     answerInput.disabled = false;
     answerInput.style.opacity = 1;
     answerInput.placeholder = 'Tape ta réponse ici...';
@@ -2040,19 +2937,110 @@ socket.on('round-start', data => {
   } else {
     answerInput.disabled = true;
     answerInput.style.opacity = 0.5;
-    answerInput.placeholder = "Au tour de l'adversaire...";
+    answerInput.placeholder = getWaitingPlaceholder(data.activePlayerId);
     passBtn.disabled = true;
     passBtn.style.opacity = 0.5;
   }
 });
 
+// ============================================================
+//  Affichage animé du gain d'XP sur l'écran de fin de match.
+//  myXp = { gain, oldXp, newXp, levelBefore, levelAfter, leveledUp, levelInfo }
+// ============================================================
+function showXpResult(myXp) {
+  const box = document.getElementById('xp-result');
+  if (!box || !myXp) return;
+
+  const gainEl = document.getElementById('xp-result-gain');
+  const levelupEl = document.getElementById('xp-result-levelup');
+  const newLevelEl = document.getElementById('xp-result-newlevel');
+  const fillEl = document.getElementById('xp-result-bar-fill');
+  const levelLabel = document.getElementById('xp-result-level-label');
+  const nextLabel = document.getElementById('xp-result-next-label');
+
+  box.style.display = 'block';
+  levelupEl.style.display = 'none';
+
+  // Compteur "+X XP" qui s'incrémente
+  gainEl.textContent = '+0 XP';
+  const gain = myXp.gain || 0;
+  const start = performance.now();
+  const dur = 900;
+  function tick(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - t, 3);
+    gainEl.textContent = `+${Math.round(gain * eased)} XP`;
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // Barre de progression. On utilise le helper client si dispo.
+  const infoBefore = (typeof xpLevelFromTotal === 'function')
+    ? xpLevelFromTotal(myXp.oldXp)
+    : { level: myXp.levelBefore, progress: 0 };
+  const infoAfter = (typeof xpLevelFromTotal === 'function')
+    ? xpLevelFromTotal(myXp.newXp)
+    : (myXp.levelInfo || { level: myXp.levelAfter, progress: 1 });
+
+  levelLabel.textContent = `Nv. ${infoBefore.level}`;
+  fillEl.style.transition = 'none';
+  fillEl.style.width = `${Math.round(infoBefore.progress * 100)}%`;
+  nextLabel.textContent = infoBefore.isMax
+    ? 'MAX'
+    : `${infoBefore.xpInLevel} / ${infoBefore.xpForNext}`;
+
+  // Forcer un reflow puis animer
+  void fillEl.offsetWidth;
+
+  setTimeout(() => {
+    if (myXp.leveledUp) {
+      // 1) remplir jusqu'à 100%, 2) montée de niveau, 3) re-remplir au niveau atteint
+      fillEl.style.transition = 'width 0.6s ease';
+      fillEl.style.width = '100%';
+      setTimeout(() => {
+        levelupEl.style.display = 'block';
+        newLevelEl.textContent = infoAfter.level;
+        levelLabel.textContent = `Nv. ${infoAfter.level}`;
+        fillEl.style.transition = 'none';
+        fillEl.style.width = '0%';
+        void fillEl.offsetWidth;
+        fillEl.style.transition = 'width 0.6s ease';
+        fillEl.style.width = `${Math.round(infoAfter.progress * 100)}%`;
+        nextLabel.textContent = infoAfter.isMax ? 'MAX' : `${infoAfter.xpInLevel} / ${infoAfter.xpForNext}`;
+      }, 650);
+    } else {
+      fillEl.style.transition = 'width 0.7s ease';
+      fillEl.style.width = `${Math.round(infoAfter.progress * 100)}%`;
+      nextLabel.textContent = infoAfter.isMax ? 'MAX' : `${infoAfter.xpInLevel} / ${infoAfter.xpForNext}`;
+    }
+  }, 400);
+}
+
 socket.on('game-over', data => {
+  // Rafraîchir les infos d'équipe (utile pour le test de victoire en 1v2).
+  if (data.teamNames) {
+    currentTeamNames = Object.assign(
+      { team1: 'Équipe 1', team2: 'Équipe 2' },
+      data.teamNames
+    );
+  }
+  if (data.playerTeams) {
+    currentPlayerTeams = Object.assign({}, data.playerTeams);
+  }
   updateMatchAnswers(data);
   document.getElementById('round-transition-screen').style.display = 'none';
-  // Affiche le gain/perte d'élo si disponible
+
+  // Test "j'ai gagné" adapté au format :
+  //   • 1v1 / 1v1v1+ : data.winnerId === socket.id
+  //   • 1v2          : data.winnerId === mon slot d'équipe
+  const teamMode = isTeamFormatClient(currentGameFormat);
+  const iAmWinner = teamMode
+    ? (data.winnerId === getMyMatchTeam())
+    : (data.winnerId === socket.id);
+
+  // Affiche le gain/perte d'élo si disponible (matchmaking 1v1 uniquement)
   if (data.eloChanges) {
-    const isWinner = (data.winnerId === socket.id);
-    const change = isWinner ? data.eloChanges.winner : data.eloChanges.loser;
+    const change = iAmWinner ? data.eloChanges.winner : data.eloChanges.loser;
     const sign = change.diff >= 0 ? '+' : '';
     const color = change.diff >= 0 ? '#4caf50' : '#f44336';
 
@@ -2078,6 +3066,17 @@ socket.on('game-over', data => {
       eloResultEl.style.display = 'block';
     }
   }
+
+  // ----- Affichage du gain d'XP (matchmaking ET privé) -----
+  if (data.xpChanges) {
+    const myXp = iAmWinner ? data.xpChanges.winner : data.xpChanges.loser;
+    showXpResult(myXp);
+    // Mettre à jour le currentUser + le HUD
+    if (currentUser) {
+      currentUser.xp = myXp.newXp;
+      if (typeof updateXpHUD === 'function') updateXpHUD(myXp.newXp);
+    }
+  }
   // Stoppe la boucle d'animation du chrono (match terminé).
   stopTimerLoop();
 
@@ -2089,27 +3088,28 @@ socket.on('game-over', data => {
   // Cacher le match-header (logo + pastilles) pendant l'écran de victoire/défaite
   const matchHeader = document.querySelector('#game-container .match-header');
   if (matchHeader) matchHeader.style.display = 'none';
+  document.getElementById('game-players-panel').style.display = 'none';
 
   const screen = document.getElementById('game-over-screen');
   const msg = document.getElementById('winner-message');
-  const gScoreMe = document.getElementById('game-over-score-me');
-  const gScoreOpp = document.getElementById('game-over-score-opp');
   screen.style.display = 'block';
 
-  // Score final (mêmes données que round-end : data.score est indexé par socket.id)
-  gScoreMe.innerText = (data.score && data.score[socket.id]) || 0;
-  gScoreOpp.innerText = (data.score && currentOpponentId && data.score[currentOpponentId]) || 0;
+  // Animation +1 et replacement sur le panneau permanent ET sur le classement
+  // affiché au centre du bloc principal (sous "VICTOIRE / DÉFAITE").
+  if (data.winnerId) {
+    renderGameRoster(data, {
+      animateWinnerId: data.winnerId,
+      animateDelay: 1000,
+      extraContainer: document.getElementById('game-over-multi-leaderboard')
+    });
+  }
 
-  if (data.winnerId === socket.id) {
+  if (iAmWinner) {
     msg.innerText = 'VICTOIRE !';
     msg.style.color = '#4dd0e1';
-    //     window.Avatar.setState(gameAvatarMe, 'win');
-    //     window.Avatar.setState(gameAvatarOpp, 'lose');
   } else {
     msg.innerText = 'DÉFAITE...';
     msg.style.color = '#e94560';
-    //     window.Avatar.setState(gameAvatarMe, 'lose');
-    //     window.Avatar.setState(gameAvatarOpp, 'win');
   }
 });
 
@@ -2118,8 +3118,11 @@ socket.on('game-over', data => {
 function resetGameUI(keepMatchState = false) {
   document.getElementById('input-area').style.display = '';
   document.getElementById('scoreboard').style.display = '';
+  document.getElementById('game-players-panel').style.display = '';
   document.querySelector('.hint-text').style.display = '';
   document.getElementById('game-over-screen').style.display = 'none';
+  const xpResultBox = document.getElementById('xp-result');
+  if (xpResultBox) xpResultBox.style.display = 'none';
   document.getElementById('round-transition-screen').style.display = 'none';
   // Rétablir le match-header si masqué
   const matchHeader = document.querySelector('#game-container .match-header');
@@ -2138,6 +3141,9 @@ function resetGameUI(keepMatchState = false) {
     matchInProgress = false;
     currentMatchRounds = 1;
     currentOpponentId = null;
+    // Vider le score live du match pour que les badges score disparaissent
+    // du panneau lobby.
+    currentMatchScore = {};
     // Réinitialiser le score et masquer les blocs score
     updateMatchScore([]);
     showScoreBlock('game-score-block', false);
@@ -2148,6 +3154,8 @@ function resetGameUI(keepMatchState = false) {
     document.getElementById('rounds-choice-group')?.classList.remove('locked');
     const startBtn = document.getElementById('btn-start-custom');
     if (startBtn) startBtn.innerText = 'LANCER LE DUEL';
+    // Re-rendre le panneau lobby pour qu'il enlève les badges score
+    if (typeof renderLobbyPanel === 'function') renderLobbyPanel();
   }
 }
 
@@ -2214,6 +3222,13 @@ document.getElementById('btn-back-game').addEventListener('click', () => {
 socket.on('opponent-aborted', () => {
   if (!myRoomCode) return;
   clearTransitionTimers();
+  // Si l'adversaire quitte pendant l'écran VS (pré-match), on coupe aussi les timers VS.
+  clearVsTimers();
+  vsCurrentRoomCode = null;
+  const vsCounter = document.getElementById('match-start-counter');
+  if (vsCounter) vsCounter.textContent = '';
+  document.getElementById('vs-screen').style.display = 'none';
+  document.getElementById('queue-status').style.display = 'block';
   document.getElementById('transition-container').style.display = 'none';
 
   const isMatchmaking = myRoomCode.startsWith('MATCH-');

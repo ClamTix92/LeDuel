@@ -235,6 +235,40 @@ button {
   border: 3px solid #802cff;
 }
 
+/* Badge "!" invité sur l'avatar du HUD (incite à créer un compte) */
+.top-player-identity {
+  position: relative;
+}
+
+.guest-badge {
+  position: absolute;
+  top: -3px;
+  left: 40px;
+  z-index: 5;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--orange), var(--orange-2) 90%);
+  color: #fff;
+  font-family: var(--font-title);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  border: 2px solid var(--deep);
+  box-shadow: 0 2px 8px rgba(255, 100, 40, 0.5);
+  pointer-events: none;
+  animation: guestBadgePulse 2s ease-in-out infinite;
+}
+
+@keyframes guestBadgePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 2px 8px rgba(255, 100, 40, 0.5); }
+  50% { transform: scale(1.12); box-shadow: 0 2px 14px rgba(255, 100, 40, 0.8); }
+}
+
 .top-player-text strong {
   display: block;
   font-family: var(--font-title);
@@ -299,7 +333,12 @@ button {
   position: relative;
   z-index: 1;
   width: min(1180px, calc(100vw - 48px));
-  animation: screenIn .44s cubic-bezier(.2, .9, .2, 1) both;
+  /* Animation jouée à l'entrée seulement (forwards retiré : le `transform`
+     ne reste pas appliqué après la fin de l'animation, ce qui évite que
+     .screen-panel ne devienne un "containing block" pour les enfants en
+     position: fixed (notamment les modales #round-transition-screen et
+     #game-over-screen qui doivent rester centrées dans le viewport). */
+  animation: screenIn .44s cubic-bezier(.2, .9, .2, 1);
 }
 
 @keyframes screenIn {
@@ -624,7 +663,7 @@ button {
 
 .private-join {
   display: grid;
-  grid-template-columns: 1fr 205px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
   align-items: center;
   height: 66px;
   margin-top: 28px;
@@ -637,6 +676,7 @@ button {
 
 .join-input-home {
   height: 100%;
+  min-width: 0;
   border: 0;
   outline: none;
   background: transparent;
@@ -657,6 +697,11 @@ button {
 
 .btn-join-home {
   height: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   color: #fff;
   background: linear-gradient(180deg, #cf35ff, #7922d9 78%);
@@ -1410,6 +1455,153 @@ body:not(.screen-home) .home-avatar-side {
 }
 
 /* ============================================================
+   GAME — wrapper flex (bloc central + panneau latéral classement)
+   Identique au pattern du lobby pour une cohérence visuelle.
+   Le panneau de droite est PERMANENT pendant le duel : il remplace
+   l'ancien bloc "Score X – Y" qui flottait en haut de l'écran.
+   ============================================================ */
+#game-container.game-screen-wrapper {
+  display: flex;
+  width: min(1784px, calc(100vw - 48px));
+  margin: 0 auto;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  position: relative;
+}
+
+/* Spacer invisible à gauche, équilibre la flexbox pour centrer .game-main */
+.game-spacer-left {
+  flex: 0 0 280px;
+  height: 1px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Bloc central : garde son style game-screen (background, padding, etc.) */
+.game-main.game-screen {
+  flex: 0 1 1180px;
+  min-width: 0;
+  margin: 0;
+  position: relative;
+}
+
+/* Panneau latéral classement : mêmes dimensions/marges que le panel du lobby */
+.game-players-panel {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: stretch;
+  margin-top: 150px;
+  max-height: calc(100vh - 230px);
+}
+
+/* Badge score à droite de chaque chip joueur (lobby et game) */
+.lobby-player-chip.has-score {
+  padding-right: 46px;
+}
+
+.lobby-player-chip-score {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 26px;
+  text-align: center;
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffcf42;
+  text-shadow: 0 0 12px rgba(255, 207, 66, .55);
+  line-height: 1;
+  /* Transition douce pour le changement de valeur */
+  transition: transform .25s ease;
+}
+
+/* Animation appliquée au moment du +1 (la valeur saute légèrement) */
+.lobby-player-chip-score.score-just-incremented {
+  animation: scoreBump .55s cubic-bezier(.22, .61, .36, 1);
+}
+
+@keyframes scoreBump {
+  0%   { transform: translateY(-50%) scale(1); }
+  35%  { transform: translateY(-50%) scale(1.45); }
+  100% { transform: translateY(-50%) scale(1); }
+}
+
+/* Petit "+1" qui flotte au-dessus du score qui vient d'être incrémenté */
+.lobby-player-chip-plus-one {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 900;
+  color: #2bc760;
+  text-shadow: 0 0 12px rgba(43, 199, 96, .7);
+  pointer-events: none;
+  animation: chipPlusOneFloat 1.05s cubic-bezier(.22, .61, .36, 1) forwards;
+}
+
+@keyframes chipPlusOneFloat {
+  0%   { opacity: 0; transform: translateY(-50%); }
+  20%  { opacity: 1; transform: translateY(-130%); }
+  100% { opacity: 0; transform: translateY(-200%); }
+}
+
+/* Flash glow sur la ligne du gagnant pendant l'animation +1 */
+.lobby-player-chip.score-flash {
+  animation: chipScoreFlash .9s cubic-bezier(.22, .61, .36, 1);
+}
+
+@keyframes chipScoreFlash {
+  0%   { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 4px 10px rgba(0, 0, 0, .25); }
+  35%  { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 22px rgba(255, 138, 32, .55); }
+  100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 4px 10px rgba(0, 0, 0, .25); }
+}
+
+/* Pendant l'animation, les chips se réordonnent avec une transition douce */
+.lobby-players-zone .lobby-player-chip,
+.game-players-panel .lobby-player-chip,
+.multi-leaderboard .lobby-player-chip {
+  transition: transform .55s cubic-bezier(.22, .61, .36, 1),
+              filter .35s ease,
+              box-shadow .35s ease;
+}
+
+/* ============================================================
+   CLASSEMENT EMBARQUÉ (inline) dans les écrans de fin de manche
+   et de fin de match. Affiché au centre du bloc principal, sous
+   le titre "Manche perdue/remportée" ou "VICTOIRE/DÉFAITE".
+   Réutilise les chips du panneau (mêmes classes .lobby-player-chip)
+   pour une cohérence visuelle parfaite.
+   ============================================================ */
+.multi-leaderboard.inline-leaderboard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(420px, 90%);
+  margin: 22px auto 12px;
+  padding: 0;
+}
+
+.multi-leaderboard.inline-leaderboard .lobby-player-chip {
+  /* Légèrement plus grand qu'en panneau latéral car on a la place ici */
+  min-height: 54px;
+  font-size: 19px;
+}
+
+.multi-leaderboard.inline-leaderboard .lobby-player-chip-score {
+  font-size: 24px;
+}
+
+/* ============================================================
    LOBBY — Panneau latéral des joueurs / spectateurs
    ============================================================ */
 .lobby-players-panel {
@@ -1652,6 +1844,99 @@ body:not(.screen-home) .home-avatar-side {
   padding: 8px;
   border: 1px dashed rgba(255, 255, 255, .12);
   border-radius: 14px;
+}
+
+/* ====== Header d'équipe ÉDITABLE (1v2) ======
+   Le header sert toujours de pilule (label) ; quand l'utilisateur est
+   membre de l'équipe, il devient cliquable + affiche un petit crayon. */
+.lobby-team-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.lobby-team-header-editable {
+  cursor: pointer;
+  transition: filter .14s ease, transform .14s ease;
+}
+
+.lobby-team-header-editable:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+.lobby-team-header-editable:focus-visible {
+  outline: 2px solid #ffcf42;
+  outline-offset: 2px;
+}
+
+.lobby-team-header-edit {
+  font-size: 14px;
+  opacity: .65;
+  transition: opacity .14s ease;
+}
+
+.lobby-team-header-editable:hover .lobby-team-header-edit {
+  opacity: 1;
+}
+
+/* Mode édition : on remplace le label par un input centré dans la pilule. */
+.lobby-team-header-input {
+  background: rgba(0, 0, 0, .35);
+  color: #ffcf42;
+  border: 2px solid rgba(255, 207, 66, .55);
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  text-align: center;
+  width: 100%;
+  max-width: 220px;
+  outline: none;
+  box-shadow: 0 0 12px rgba(255, 207, 66, .25);
+}
+
+.lobby-team-header-input:focus {
+  border-color: rgba(255, 207, 66, .9);
+  box-shadow: 0 0 18px rgba(255, 207, 66, .45);
+}
+
+/* ====== Panneau classement de droite en mode équipe ====== */
+.game-roster-team-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.game-roster-team-header {
+  justify-content: space-between !important;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.game-roster-team-score {
+  position: relative;
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, .25);
+  min-width: 28px;
+  text-align: right;
+}
+
+.game-roster-team-score.score-just-incremented {
+  animation: score-bump .6s ease;
+}
+
+@keyframes score-bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.35); color: #ffcf42; }
+  100% { transform: scale(1); }
 }
 
 /* Menu contextuel mobile (clic sur chip) */
@@ -1982,6 +2267,131 @@ body:not(.screen-home) .home-avatar-side {
   margin: 6px 0 0 0;
 }
 
+/* =================================================
+   BOUTON REROLL (matchmaking — écran VS)
+   ================================================= */
+.match-theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+
+.match-theme-label {
+  margin: 0 !important;
+}
+
+.btn-reroll-theme {
+  position: relative;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  /* Hauteur calée sur la taille de police du thème pour rester aligné */
+  height: 50px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .15s ease, filter .2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-reroll-theme:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.03);
+  filter: drop-shadow(0 0 12px rgba(82, 140, 255, .55));
+}
+
+.btn-reroll-theme:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+}
+
+.btn-reroll-theme:disabled {
+  cursor: not-allowed;
+  filter: grayscale(1) brightness(.55) opacity(.7);
+}
+
+.btn-reroll-img {
+  height: 100%;
+  width: auto;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Badge "X/3" en haut à droite du bouton */
+.btn-reroll-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 30px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff971e, #ff3f70);
+  color: #fff;
+  font-family: var(--font-title), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 22px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .35), 0 0 0 2px rgba(20, 8, 50, .9);
+  pointer-events: none;
+  letter-spacing: .3px;
+}
+
+.btn-reroll-theme:disabled .btn-reroll-badge {
+  background: linear-gradient(135deg, #6b6b6b, #4a4a4a);
+}
+
+/* Petit indicateur de cooldown affiché sous le bouton quand quota épuisé */
+.btn-reroll-cooldown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #ffb86b;
+  font-weight: 700;
+  white-space: nowrap;
+  font-style: italic;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+  pointer-events: none;
+}
+
+/* Animation déclenchée au clic sur reroll : le bouton tourne brièvement */
+@keyframes rerollSpin {
+  0%   { transform: rotate(0deg)   scale(1); }
+  50%  { transform: rotate(180deg) scale(1.12); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+.btn-reroll-theme.is-rerolling .btn-reroll-img {
+  animation: rerollSpin .55s cubic-bezier(.36, .07, .19, .97);
+}
+
+/* Animation discrète sur le thème quand il change */
+@keyframes themeSwap {
+  0%   { opacity: 0;   transform: translateY(-6px) scale(.96); filter: blur(2px); }
+  60%  { opacity: 1;   transform: translateY(0)    scale(1.04); filter: blur(0); }
+  100% { opacity: 1;   transform: translateY(0)    scale(1);    filter: blur(0); }
+}
+#match-theme.is-swapping {
+  display: inline-block;
+  animation: themeSwap .45s ease-out;
+}
+
+/* Compteur (X) à côté de "Le match va commencer !" */
+.match-start-counter {
+  margin-left: 8px;
+  color: #ffcf42;
+  font-weight: 800;
+  display: inline-block;
+  min-width: 36px;
+  text-align: left;
+}
+
 /* Game screen */
 .game-screen {
   width: min(920px, calc(100vw - 48px));
@@ -2282,6 +2692,84 @@ body:not(.screen-home) .home-avatar-side {
 /* On retire la règle historique qui colorait le span en jaune. */
 #scoreboard span {
   color: #ffffff;
+}
+
+/* ============================================================
+   SCOREBOARD MULTI-JOUEURS (1v1v1+)
+   Activé par la classe .scoreboard-multi posée par le JS quand
+   le format actif n'est pas '1v1'. Layout en grille qui s'adapte
+   au nombre de pastilles (2 colonnes sur petit écran, 3+ sinon).
+   ============================================================ */
+#scoreboard.scoreboard-multi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+/* Une pastille multi : la barre de chrono se rétracte de la droite
+   vers la gauche (par défaut), exactement comme la pastille "me" en 1v1. */
+#scoreboard.scoreboard-multi .player-multi {
+  min-height: 64px;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+#scoreboard.scoreboard-multi .player-multi .timer-bar {
+  right: 0;
+  left: auto;
+}
+
+#scoreboard.scoreboard-multi .player-multi .timer-label {
+  position: relative;
+  z-index: 1;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+
+#scoreboard.scoreboard-multi .player-multi .timer-value {
+  position: relative;
+  z-index: 1;
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0;
+}
+
+/* Pastille du joueur courant (toi) : un liseré jaune léger pour la repérer. */
+#scoreboard.scoreboard-multi .player-multi-me {
+  border-color: rgba(255, 207, 66, .55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .06),
+    0 0 0 1px rgba(255, 207, 66, .25);
+}
+
+/* Pastille du joueur actif (dont c'est le tour) — boost lumineux. */
+#scoreboard [data-player-pill].pill-is-active {
+  border-color: rgba(255, 138, 32, .8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .12),
+    0 0 18px rgba(255, 138, 32, .35);
+}
+
+/* Animation de disparition pour les joueurs éliminés d'une manche. */
+#scoreboard [data-player-pill].pill-eliminated {
+  animation: pill-fade-out .45s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes pill-fade-out {
+  0%   { opacity: 1; transform: scale(1); filter: grayscale(0); }
+  60%  { opacity: .25; transform: scale(.94); filter: grayscale(1); }
+  100% { opacity: 0; transform: scale(.88); filter: grayscale(1); }
 }
 
 .game-avatars-row {
@@ -3062,7 +3550,7 @@ body:not(.screen-home) .home-avatar-side {
   }
 
   .private-join {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
     height: auto;
   }
 
@@ -3106,7 +3594,7 @@ body:not(.screen-home) .home-avatar-side {
   }
 
   .screen-home-main {
-    padding-top: 60px;
+    padding-top: 90px;
     padding-left: 14px;
     padding-right: 14px;
     padding-bottom: 24px;
@@ -3328,8 +3816,8 @@ body:not(.screen-home) .home-avatar-side {
 
   .brand-zone {
     height: 120px;
-    margin-top: 6px;
-    margin-bottom: 12px;
+    margin-top: -25px;       /* ← ESPACE header → logo (augmente pour descendre le logo) */
+    margin-bottom: 12px;   /* ← ESPACE logo → "Choisis ton mode" */
 
     display: flex;
     align-items: center;
@@ -3349,11 +3837,14 @@ body:not(.screen-home) .home-avatar-side {
   ========================= */
 
   .mode-cards {
-    width: 100%;
+    width: min(92vw, 430px);
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 16px;
     margin-top: 0;
   }
 
@@ -3363,7 +3854,7 @@ body:not(.screen-home) .home-avatar-side {
     width: min(92vw, 430px);
     display: block;
 
-    margin: 0 auto 1px;
+    margin: 10px 10px -10px 10px;    /* ← ESPACE "Choisis ton mode" → cartes Images/Quiz (valeur après "auto") */
 
     font-family: inherit;
     font-size: 1.35rem;
@@ -3379,6 +3870,7 @@ body:not(.screen-home) .home-avatar-side {
 
   .mode-card {
     width: min(92vw, 430px);
+    max-width: 100%;
     min-height: 150px;
     height: auto;
 
@@ -3451,8 +3943,10 @@ body:not(.screen-home) .home-avatar-side {
 
   .private-bar {
     width: min(92vw, 430px);
-    min-height: 0;
+    max-width: 100%;
+    align-self: center;
     margin: 18px auto 0;
+    min-height: 0;
     padding: 18px;
     display: flex;
     flex-direction: column;
@@ -3536,7 +4030,7 @@ body:not(.screen-home) .home-avatar-side {
   .private-join {
     order: 3;
     width: 100%;
-    grid-template-columns: 1fr 120px;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
     height: 56px;
     margin-top: 0;
     align-items: center;
@@ -3544,9 +4038,15 @@ body:not(.screen-home) .home-avatar-side {
 
   .join-input-home {
     height: 100%;
-    font-size: 1rem;
-    padding: 0 14px;
-    letter-spacing: 1px;
+    min-width: 0;
+    font-size: 0.92rem;
+    padding: 0 10px;
+    letter-spacing: 0.5px;
+    text-overflow: ellipsis;
+  }
+
+  .join-input-home::placeholder {
+    font-size: 0.88rem;
   }
 
   .btn-join-home {
@@ -3554,8 +4054,9 @@ body:not(.screen-home) .home-avatar-side {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
-    font-size: 1rem;
+    padding: 0 6px;
+    font-size: 0.95rem;
+    white-space: nowrap;
   }
 
   /* =========================
@@ -3606,13 +4107,39 @@ body:not(.screen-home) .home-avatar-side {
     }
 
     /* En mode colonne, le fantôme n'a plus de raison d'être */
-    .lobby-spacer-left {
+    .lobby-spacer-left,
+    .game-spacer-left {
       display: none;
     }
 
     /* En mode colonne, pas besoin de décaler le panneau */
-    .lobby-players-panel {
+    .lobby-players-panel,
+    .game-players-panel {
       margin-top: 0;
+    }
+
+    /* Wrapper game : même comportement que le lobby sur mobile */
+    #game-container.game-screen-wrapper {
+      flex-direction: column;
+      gap: 12px;
+      width: calc(100vw - 16px) !important;
+      padding: 0 !important;
+    }
+
+    /* Bloc central game : pleine largeur en mobile */
+    #game-container .game-main.game-screen {
+      width: 100% !important;
+      flex: 1 1 auto;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+
+    /* Panneau game sur mobile : pleine largeur, max-height auto */
+    .game-players-panel {
+      flex: 1 1 auto;
+      width: 100%;
+      max-height: none;
+      padding: 0 8px;
     }
 
     /* Bloc central : reprend les anciens overrides du lobby */
@@ -3794,8 +4321,6 @@ body:not(.screen-home) .home-avatar-side {
     gap: 8px;
     margin-bottom: 4px;
     border-radius: 20px;
-    margin-left: -28px !important;
-    margin-right: -28px !important;
   }
 
   #lobby-container .lobby-code-row {
@@ -3858,6 +4383,24 @@ body:not(.screen-home) .home-avatar-side {
   margin: 0;
 }
 
+/* ----- Sous-header : intro + toggle Mode Arcade alignés ----- */
+/* On sort le toggle "Mode Arcade" du header pour éviter qu'il se fasse
+   bousculer par le titre dynamique "Paramètres de la partie - Manche X/Y"
+   qui devient long à partir de la 2e manche. */
+.host-settings-subheader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 20px;
+  flex-wrap: wrap;
+}
+
+.host-settings-subheader .settings-intro {
+  margin: 0;            /* sa marge bottom historique est portée par le subheader */
+  flex: 1 1 auto;
+}
+
 .answers-toggle-btn {
   display: inline-flex;
   align-items: center;
@@ -3882,6 +4425,9 @@ body:not(.screen-home) .home-avatar-side {
   color: var(--white);
   line-height: 1;
 }
+
+/* Label compact "Rép" : caché par défaut (desktop), affiché en mobile via media query */
+.answers-toggle-label-compact { display: none; }
 
 .answers-toggle-arrow {
   width: 56px;
@@ -4204,14 +4750,19 @@ footer a:hover {
 }
 
 .auth-modal {
-  background: #1a1a2e;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 32px 28px 28px;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(138, 38, 255, 0.22), transparent 60%),
+    linear-gradient(180deg, var(--panel-strong), var(--deep) 92%);
+  border: 2.5px solid rgba(138, 56, 255, 0.55);
+  border-radius: 26px;
+  padding: 30px 26px 26px;
   width: 100%;
   max-width: 400px;
   position: relative;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(159, 55, 255, 0.22);
   animation: authSlideIn 0.25s ease;
 }
 
@@ -4231,59 +4782,68 @@ footer a:hover {
   position: absolute;
   top: 12px;
   right: 14px;
-  background: none;
+  background: rgba(255, 255, 255, 0.06);
   border: none;
-  color: #888;
+  color: var(--muted);
   font-size: 1.1rem;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: color 0.2s;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: color 0.2s, background 0.2s;
 }
 
 .auth-close:hover {
   color: #fff;
+  background: rgba(207, 54, 255, 0.28);
 }
 
 /* Onglets */
 .auth-tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 24px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-  padding: 4px;
+  margin-bottom: 22px;
+  background: rgba(9, 2, 25, 0.6);
+  border: 1px solid rgba(138, 56, 255, 0.22);
+  border-radius: 14px;
+  padding: 5px;
 }
 
 .auth-tab {
   flex: 1;
   background: none;
   border: none;
-  color: #888;
-  font-family: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-  padding: 8px;
-  border-radius: 7px;
+  color: var(--muted);
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 9px;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .auth-tab.active {
-  background: #e94560;
+  background: linear-gradient(180deg, var(--violet-2), var(--violet) 85%);
   color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 14px rgba(171, 51, 255, 0.4);
 }
 
 /* Titre */
 .auth-title {
-  font-size: 1.3rem;
-  font-weight: 700;
+  font-family: var(--font-title);
+  font-size: 1.5rem;
+  font-weight: 800;
   color: #fff;
   margin: 0 0 20px;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
 }
 
 .auth-subtitle {
-  color: #aaa;
+  color: var(--muted);
   font-size: 0.9rem;
   margin: -12px 0 20px;
 }
@@ -4298,41 +4858,43 @@ footer a:hover {
 
 .auth-field label {
   font-size: 0.85rem;
-  font-weight: 600;
-  color: #ccc;
+  font-weight: 700;
+  color: var(--muted);
 }
 
 .auth-hint {
-  color: #888;
+  color: rgba(205, 185, 255, 0.6);
   font-weight: 400;
 }
 
 .auth-field input {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  background: rgba(9, 2, 25, 0.7);
+  border: 1.5px solid rgba(138, 56, 255, 0.3);
+  border-radius: 12px;
   color: #fff;
-  font-family: inherit;
-  font-size: 0.95rem;
-  padding: 10px 12px;
+  font-family: var(--font-ui);
+  font-size: 0.98rem;
+  font-weight: 600;
+  padding: 12px 14px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .auth-field input:focus {
-  border-color: #e94560;
+  border-color: var(--violet-2);
+  box-shadow: 0 0 0 3px rgba(207, 54, 255, 0.18);
 }
 
 .auth-field input::placeholder {
-  color: #555;
+  color: rgba(205, 185, 255, 0.4);
 }
 
 /* Transfert élo */
 .auth-transfer-elo {
-  background: rgba(77, 208, 225, 0.08);
-  border: 1px solid rgba(77, 208, 225, 0.2);
-  border-radius: 8px;
-  padding: 10px 12px;
+  background: rgba(255, 139, 22, 0.1);
+  border: 1.5px solid rgba(255, 139, 22, 0.32);
+  border-radius: 12px;
+  padding: 11px 13px;
   margin-bottom: 14px;
 }
 
@@ -4341,36 +4903,44 @@ footer a:hover {
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
-  color: #ccc;
+  color: #fff;
+  font-weight: 600;
   cursor: pointer;
+}
+
+.auth-checkbox-label input {
+  accent-color: var(--orange);
+  width: 16px;
+  height: 16px;
 }
 
 .auth-elo-preview {
   margin-left: auto;
   font-size: 0.8rem;
-  color: #4dd0e1;
-  font-weight: 600;
+  color: var(--yellow);
+  font-weight: 700;
 }
 
 /* Bouton principal */
 .auth-btn-primary {
   width: 100%;
-  background: linear-gradient(135deg, #e94560, #c73652);
+  background: linear-gradient(180deg, var(--violet-2), var(--violet) 80%);
   border: none;
-  border-radius: 10px;
+  border-radius: 14px;
   color: #fff;
-  font-family: inherit;
-  font-size: 1rem;
-  font-weight: 700;
-  padding: 12px;
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 800;
+  padding: 13px;
   cursor: pointer;
   margin-top: 6px;
-  transition: opacity 0.2s, transform 0.1s;
+  transition: filter 0.18s, transform 0.1s;
   letter-spacing: 0.5px;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.22), 0 8px 22px rgba(171, 51, 255, 0.35);
 }
 
 .auth-btn-primary:hover {
-  opacity: 0.9;
+  filter: brightness(1.12);
 }
 
 .auth-btn-primary:active {
@@ -4387,9 +4957,10 @@ footer a:hover {
   width: 100%;
   background: none;
   border: none;
-  color: #888;
-  font-family: inherit;
+  color: var(--muted);
+  font-family: var(--font-ui);
   font-size: 0.85rem;
+  font-weight: 600;
   padding: 8px;
   cursor: pointer;
   margin-top: 6px;
@@ -4397,27 +4968,29 @@ footer a:hover {
 }
 
 .auth-link:hover {
-  color: #fff;
+  color: var(--violet-2);
 }
 
 /* Messages */
 .auth-error {
-  background: rgba(233, 69, 96, 0.15);
-  border: 1px solid rgba(233, 69, 96, 0.3);
-  border-radius: 7px;
-  color: #ff8a9a;
+  background: rgba(255, 63, 102, 0.15);
+  border: 1.5px solid rgba(255, 63, 102, 0.4);
+  border-radius: 10px;
+  color: #ff9bb0;
   font-size: 0.85rem;
-  padding: 8px 12px;
+  font-weight: 600;
+  padding: 9px 13px;
   margin-bottom: 10px;
 }
 
 .auth-success {
-  background: rgba(76, 175, 80, 0.15);
-  border: 1px solid rgba(76, 175, 80, 0.3);
-  border-radius: 7px;
-  color: #81c784;
+  background: rgba(255, 211, 77, 0.13);
+  border: 1.5px solid rgba(255, 211, 77, 0.4);
+  border-radius: 10px;
+  color: var(--yellow);
   font-size: 0.85rem;
-  padding: 8px 12px;
+  font-weight: 600;
+  padding: 9px 13px;
   margin-bottom: 10px;
 }
 
@@ -4455,9 +5028,9 @@ footer a:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #555;
+  color: var(--muted);
   font-size: 0.85rem;
-  margin: 12px 0;
+  margin: 14px 0;
 }
 
 .auth-separator::before,
@@ -4465,7 +5038,7 @@ footer a:hover {
   content: '';
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(138, 56, 255, 0.25);
 }
 
 .auth-btn-google {
@@ -4475,9 +5048,9 @@ footer a:hover {
   gap: 10px;
   background: #fff;
   color: #333;
-  border-radius: 10px;
-  padding: 10px;
-  font-weight: 600;
+  border-radius: 14px;
+  padding: 11px;
+  font-weight: 700;
   font-size: 0.95rem;
   text-decoration: none;
   transition: opacity 0.2s;
@@ -4556,8 +5129,11 @@ footer a:hover {
     white-space: nowrap !important;
   }
 
+  /* On déplace le margin-left:auto de l'engrenage vers le 1er élo
+     pour que le groupe [élo images · élo quiz · énergie · engrenage]
+     soit collé à droite, sans espace entre énergie et engrenage. */
   #elo-images {
-    margin-left: 5px !important;
+    margin-left: auto !important;   /* pousse tout le groupe vers la droite */
   }
 
   #elo-images::before,
@@ -4603,12 +5179,13 @@ footer a:hover {
     height: 49px !important;
     min-width: 49px !important;
     flex: 0 0 49px !important;
-    margin-left: auto !important;
+    margin-left: 6px !important;   /* petit écart visuel énergie ↔ engrenage */
   }
 
+  /* Icône engrenage : agrandie pour occuper tout le cercle */
   #btn-auth-gear .profile-settings-icon {
-    width: 40px !important;
-    height: 40px !important;
+    width: 45px !important;
+    height: 45px !important;
   }
 }
 
@@ -4650,9 +5227,29 @@ footer a:hover {
   /* ===== ÉLÉMENTS DÉCORATIFS MASQUÉS SUR MOBILE ===== */
   .particle-layer,
   .home-mascot,
-  .card-confetti,
-  .answers-toggle-btn {
+  .card-confetti {
     display: none !important;
+  }
+
+  /* Bouton "Réponses" : ramené sur mobile en version compacte "Rép →" */
+  .answers-toggle-btn {
+    gap: 4px;
+    padding: 2px 6px 2px 8px;
+    flex-shrink: 0;            /* ne se laisse pas écraser par un titre long */
+  }
+  .answers-toggle-label-full { display: none; }
+  .answers-toggle-label-compact {
+    display: inline-block;
+    font-size: 16px;
+    line-height: 1;
+  }
+  .answers-toggle-arrow {
+    width: 24px;
+    height: 24px;
+    filter: drop-shadow(0 0 6px rgba(154, 71, 255, .5));
+  }
+  .answers-toggle-btn:hover .answers-toggle-arrow {
+    transform: translateX(2px) scale(1.04);
   }
 
   /* ===== BOUTON RETOUR : plus discret en haut à gauche ===== */
@@ -4823,6 +5420,18 @@ footer a:hover {
     font-size: 12px;
     margin: 0 0 10px;
     line-height: 1.3;
+  }
+
+  /* Sous-header sur mobile : compact, sans grosse marge bottom */
+  .host-settings-subheader {
+    margin: 0 0 10px;
+    gap: 10px;
+  }
+
+  /* L'intro mobile garde sa propre margin-bottom de 10px ; on l'annule ici
+     car le subheader la prend déjà en charge. */
+  .host-settings-subheader .settings-intro {
+    margin: 0;
   }
 
   /* Mode / Temps / Manches passent en colonne unique */
@@ -5077,12 +5686,45 @@ footer a:hover {
     display: none !important;
   }
 
-  /* Écran fin de manche */
+  /* Écran fin de manche : sur mobile, on centre dans le viewport entier
+     (fixed) au lieu de dans .game-screen (absolute). Sinon, sur un téléphone
+     avec un .game-screen plus haut que la fenêtre, le modal se retrouvait
+     centré hors-écran (en haut, tronqué). */
   #round-transition-screen {
-    width: calc(100% - 12px);
-    max-width: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100vw - 24px);
+    max-width: 480px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
     padding: 22px 16px;
     border-radius: 22px;
+    z-index: 50;
+  }
+
+  /* Classement embarqué : chips plus compacts sur mobile */
+  .multi-leaderboard.inline-leaderboard {
+    width: 100%;
+    margin: 16px auto 6px;
+    gap: 8px;
+  }
+
+  .multi-leaderboard.inline-leaderboard .lobby-player-chip {
+    min-height: 44px;
+    font-size: 15px;
+    padding: 6px 12px;
+  }
+
+  .multi-leaderboard.inline-leaderboard .lobby-player-chip.has-crown {
+    padding-left: 30px;
+  }
+
+  .multi-leaderboard.inline-leaderboard .lobby-player-chip-score {
+    font-size: 19px;
+    min-width: 22px;
+    right: 10px;
   }
 
   #round-transition-result {
@@ -5107,12 +5749,19 @@ footer a:hover {
     font-size: 36px;
   }
 
-  /* Écran fin de match */
+  /* Écran fin de match : même logique que round-transition (fixed dans le viewport) */
   #game-over-screen {
-    width: calc(100% - 12px);
-    max-width: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100vw - 24px);
+    max-width: 480px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
     padding: 22px 16px;
     border-radius: 22px;
+    z-index: 50;
   }
 
   .game-over-logo {
@@ -5342,6 +5991,30 @@ footer a:hover {
   .match-hint {
     font-size: 12px;
     max-width: 100%;
+  }
+
+  /* Bouton reroll en mobile : plus compact */
+  .match-theme-row {
+    gap: 10px;
+  }
+  .btn-reroll-theme {
+    height: 38px;
+  }
+  .btn-reroll-badge {
+    min-width: 24px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 11px;
+    line-height: 18px;
+    top: -5px;
+    right: -6px;
+  }
+  .btn-reroll-cooldown {
+    font-size: 10px;
+  }
+  .match-start-counter {
+    margin-left: 6px;
+    min-width: 28px;
   }
 
   /* =================================================
@@ -5909,8 +6582,8 @@ footer a:hover {
   }
 
   #btn-auth-gear .profile-settings-icon {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
   }
 
   /* ==========================================================
@@ -6158,4 +6831,71 @@ footer a:hover {
       padding: 0 !important;
     }
   }
+}
+/* ============================================================
+   GAIN D'XP — écran de fin de match (1v1)
+   ============================================================ */
+.xp-result {
+  margin: 14px auto 0;
+  max-width: 340px;
+  text-align: center;
+}
+
+.xp-result-gain {
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--yellow);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 0 14px rgba(255, 211, 77, 0.5);
+  letter-spacing: 0.5px;
+}
+
+.xp-result-levelup {
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+  margin-top: 6px;
+  padding: 4px 0;
+  background: linear-gradient(90deg, transparent, rgba(207, 54, 255, 0.28), transparent);
+  text-shadow: 0 0 16px rgba(207, 54, 255, 0.9);
+  animation: xpLevelUpPop 0.5s cubic-bezier(.2, 1.6, .4, 1);
+}
+
+@keyframes xpLevelUpPop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.xp-result-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.xp-result-level-label,
+.xp-result-next-label {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.xp-result-bar-track {
+  flex: 1;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(9, 2, 25, 0.7);
+  border: 1.5px solid rgba(138, 56, 255, 0.3);
+  overflow: hidden;
+}
+
+.xp-result-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff8c2e, #ef32ff 90%);
+  box-shadow: inset 0 2px 5px rgba(255, 255, 255, 0.24), 0 0 10px rgba(239, 50, 255, 0.4);
 }

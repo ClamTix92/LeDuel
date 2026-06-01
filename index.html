@@ -213,14 +213,6 @@
             </div>
           </div>
 
-          <div class="match-score-block" id="lobby-score-block" style="display:none;">
-            <p class="score-block-label">Score</p>
-            <div class="score-block-digits">
-              <span id="lobby-score-me">0</span>
-              <span class="score-block-sep"> – </span>
-              <span id="lobby-score-opp">0</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -231,6 +223,16 @@
       <div class="host-settings-header">
         <h3 id="settings-title">Paramètres de la partie</h3>
 
+        <button class="answers-toggle-btn" id="btn-show-answers" type="button" aria-label="Voir les réponses du match">
+          <span class="answers-toggle-label answers-toggle-label-full">Réponses</span>
+          <span class="answers-toggle-label answers-toggle-label-compact" aria-hidden="true">Rép</span>
+          <img src="assets/arrow-icon.png" alt="" class="answers-toggle-arrow" aria-hidden="true">
+        </button>
+      </div>
+
+      <div class="host-settings-subheader">
+        <p class="settings-intro">Choisis les règles avant de lancer le duel.</p>
+
         <button class="arcade-mode-toggle" id="btn-arcade-mode" type="button"
                 role="switch" aria-checked="false" aria-label="Activer le mode arcade">
           <span class="arcade-toggle-switch" aria-hidden="true">
@@ -238,13 +240,7 @@
           </span>
           <span class="arcade-toggle-label">Mode Arcade</span>
         </button>
-
-        <button class="answers-toggle-btn" id="btn-show-answers" type="button" aria-label="Voir les réponses du match">
-          <span class="answers-toggle-label">Réponses</span>
-          <img src="assets/arrow-icon.png" alt="" class="answers-toggle-arrow" aria-hidden="true">
-        </button>
       </div>
-      <p class="settings-intro">Choisis les règles avant de lancer le duel.</p>
 
       <div class="setting-row">
         <div class="setting-block setting-block-inline">
@@ -445,26 +441,34 @@
       </div>
 
       <div class="match-info">
-        <p>Thème : <span id="match-theme" class="highlight">---</span></p>
+        <div class="match-theme-row">
+          <p class="match-theme-label">Thème : <span id="match-theme" class="highlight">---</span></p>
+          <button id="btn-reroll-theme" class="btn-reroll-theme" type="button" aria-label="Relancer le thème">
+            <img src="assets/reroll_button.png" alt="" class="btn-reroll-img" aria-hidden="true">
+            <span class="btn-reroll-badge" id="reroll-badge">3/3</span>
+            <span class="btn-reroll-cooldown" id="reroll-cooldown" aria-hidden="true"></span>
+          </button>
+        </div>
         <p id="match-hint" class="match-hint"></p>
-        <p id="match-countdown" class="match-start-label">Le match va commencer !</p>
+        <p id="match-countdown" class="match-start-label">
+          <span class="match-start-text">Le match va commencer !</span>
+          <span class="match-start-counter" id="match-start-counter"></span>
+        </p>
       </div>
 
     </div>
   </section>
 
   <!-- ÉCRAN 5 : JEU -->
-  <section id="game-container" class="screen-panel game-screen" style="display:none;">
-    <button class="btn-back" id="btn-back-game" type="button">← Retour</button>
+  <section id="game-container" class="screen-panel game-screen-wrapper" style="display:none;">
 
-    <div class="match-score-block" id="game-score-block" style="display:none;">
-      <p class="score-block-label">Score</p>
-      <div class="score-block-digits">
-        <span id="game-score-me">0</span>
-        <span class="score-block-sep"> – </span>
-        <span id="game-score-opp">0</span>
-      </div>
-    </div>
+    <!-- Fantôme invisible : équilibre la flexbox pour que .game-main soit
+         vraiment centré sur l'écran (mêmes 280px à gauche que le panneau à droite) -->
+    <div class="game-spacer-left" aria-hidden="true"></div>
+
+    <!-- ===== Bloc central : zone de duel ===== -->
+    <div class="game-main game-screen">
+    <button class="btn-back" id="btn-back-game" type="button">← Retour</button>
 
     <div class="game-avatars-row">
       <!--<div class="game-avatar-slot left" id="game-avatar-me" data-label="TOI"></div>-->
@@ -492,49 +496,65 @@
     </div>
 
     <div id="scoreboard">
-      <div class="player player-me" id="player-pill-me">
-        <div class="timer-bar timer-bar-me timer-green" id="timer-bar-me"></div>
-        <span class="timer-label">Toi</span>
+      <div class="player player-me" id="player-pill-me" data-player-pill data-pill-role="me">
+        <div class="timer-bar timer-bar-me timer-green" id="timer-bar-me" data-timer-bar></div>
+        <span class="timer-label" data-timer-label>Toi</span>
         <span class="timer-value">
-          <span class="tv-secs" id="my-time-secs">45</span><span class="tv-sep">:</span><span class="tv-centis"
-            id="my-time-centis">00</span><span class="timer-unit">s</span>
+          <span class="tv-secs" id="my-time-secs" data-timer-secs>45</span><span class="tv-sep">:</span><span class="tv-centis"
+            id="my-time-centis" data-timer-centis>00</span><span class="timer-unit">s</span>
         </span>
       </div>
-      <div class="player player-opp" id="player-pill-opp">
-        <div class="timer-bar timer-bar-opp timer-green" id="timer-bar-opp"></div>
+      <div class="player player-opp" id="player-pill-opp" data-player-pill data-pill-role="opp">
+        <div class="timer-bar timer-bar-opp timer-green" id="timer-bar-opp" data-timer-bar></div>
         <span class="timer-value">
-          <span class="tv-secs" id="opp-time-secs">45</span><span class="tv-sep">:</span><span class="tv-centis"
-            id="opp-time-centis">00</span><span class="timer-unit">s</span>
+          <span class="tv-secs" id="opp-time-secs" data-timer-secs>45</span><span class="tv-sep">:</span><span class="tv-centis"
+            id="opp-time-centis" data-timer-centis>00</span><span class="timer-unit">s</span>
         </span>
-        <span class="timer-label">Adversaire</span>
+        <span class="timer-label" data-timer-label>Adversaire</span>
       </div>
     </div>
 
-    <!-- Résultat de manche (affiché 2s avant retour au lobby) -->
+    <!-- Résultat de manche : message + classement (le panneau de droite
+         reste visible aussi, mais on dédouble le classement ici pour qu'il
+         soit bien visible sous le titre) -->
     <div id="round-transition-screen" style="display:none;">
       <h2 id="round-transition-result">Manche remportée !</h2>
-      <p class="round-transition-score-label">Score</p>
-      <div class="round-transition-score">
-        <span id="round-transition-score-me" class="round-transition-digit">0</span>
-        <em class="round-transition-sep">–</em>
-        <span id="round-transition-score-opp" class="round-transition-digit">0</span>
-      </div>
+      <div class="multi-leaderboard inline-leaderboard" id="round-multi-leaderboard"></div>
     </div>
 
     <div id="game-over-screen" style="display:none;">
       <img src="assets/logo.png" alt="Le Duel" class="game-over-logo">
       <h2 id="winner-message">VICTOIRE !</h2>
-      <p class="game-over-score-label">Score</p>
-      <div class="game-over-score">
-        <span id="game-over-score-me" class="game-over-digit">0</span>
-        <em class="game-over-sep">–</em>
-        <span id="game-over-score-opp" class="game-over-digit">0</span>
-      </div>
+      <div class="multi-leaderboard inline-leaderboard" id="game-over-multi-leaderboard"></div>
       <br>
       <button id="restart-btn" type="button">REJOUER</button>
       <br>
       <span id="elo-result" style="display:none; font-size:1.5em; font-weight:bold;"></span>
+
+      <!-- Gain d'XP de fin de match -->
+      <div id="xp-result" class="xp-result" style="display:none;">
+        <div class="xp-result-gain" id="xp-result-gain">+0 XP</div>
+        <div class="xp-result-levelup" id="xp-result-levelup" style="display:none;">NIVEAU <span id="xp-result-newlevel">0</span> !</div>
+        <div class="xp-result-bar-wrap">
+          <span class="xp-result-level-label" id="xp-result-level-label">Nv. 1</span>
+          <div class="xp-result-bar-track">
+            <div class="xp-result-bar-fill" id="xp-result-bar-fill"></div>
+          </div>
+          <span class="xp-result-next-label" id="xp-result-next-label">0 / 100</span>
+        </div>
+      </div>
     </div>
+    </div><!-- /.game-main -->
+
+    <!-- ===== Panneau latéral permanent : classement live ===== -->
+    <aside class="game-players-panel" id="game-players-panel" aria-label="Classement des joueurs">
+      <div class="lobby-panel-header lobby-panel-pill">
+        <span class="lobby-panel-pill-text lobby-panel-pill-yz">Score</span>
+      </div>
+      <div class="lobby-players-zone" id="game-roster-zone" aria-live="polite">
+        <!-- contenu généré dynamiquement par renderGameRoster() -->
+      </div>
+    </aside>
   </section>
 
   <!-- MODALE : PERSONNALISATION D'AVATAR 
@@ -741,6 +761,7 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="avatar.js"></script>
+  <script src="xp_client.js"></script>
   <script src="script.js"></script>
   <!-- Tout en bas de ton HTML, avant </body> -->
   <footer>

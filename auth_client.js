@@ -254,6 +254,10 @@ function updateUserHUD() {
   if (eloQuizEl) eloQuizEl.textContent = currentUser.elo_quiz;
   if (eloImagesEl) eloImagesEl.textContent = currentUser.elo_images;
 
+  // Badge "!" sur l'avatar si l'utilisateur est en mode invité
+  // (incite à créer un compte — il le trouvera dans la modale profil)
+  updateGuestBadge();
+
   // Bouton : si connecté avec un vrai compte → afficher "Déconnexion"
   const btnAuth = document.getElementById('btn-auth-open');
   if (btnAuth) {
@@ -262,6 +266,29 @@ function updateUserHUD() {
     } else {
       btnAuth.textContent = 'Se connecter';
     }
+  }
+}
+
+// --- Badge invité sur l'avatar du HUD ---
+function updateGuestBadge() {
+  const identity = document.getElementById('btn-profile-settings');
+  if (!identity) return;
+
+  const isGuest = !currentUser || !currentUser.email;
+  let badge = identity.querySelector('.guest-badge');
+
+  if (isGuest) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'guest-badge';
+      badge.setAttribute('aria-label', 'Crée un compte pour sauvegarder ta progression');
+      badge.title = 'Crée un compte pour sauvegarder ta progression';
+      badge.textContent = '!';
+      // ancrer sur le bouton identité (l'avatar a overflow:hidden)
+      identity.appendChild(badge);
+    }
+  } else if (badge) {
+    badge.remove();
   }
 }
 
@@ -281,7 +308,8 @@ document.getElementById('btn-auth-open')?.addEventListener('click', () => {
 });
 
 /* =========================================================
-   Engrenage HUD → ouverture modale connexion / inscription
+   Engrenage HUD → Réglages (modale à venir)
+   Pour l'instant : toast "bientôt disponible".
    ========================================================= */
 document.addEventListener("DOMContentLoaded", () => {
   const btnAuthGear = document.getElementById("btn-auth-gear");
@@ -289,41 +317,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const authOverlay = document.getElementById("auth-modal-overlay");
   const authClose = document.getElementById("btn-auth-close");
 
-  function openAuthModal() {
-    if (!authOverlay) return;
-
-    authOverlay.style.display = "flex";
-    authOverlay.setAttribute("aria-hidden", "false");
-
-    const loginEmailInput = document.getElementById("login-email");
-    if (loginEmailInput) {
-      setTimeout(() => loginEmailInput.focus(), 50);
-    }
-  }
-
-  function closeAuthModal() {
-    if (!authOverlay) return;
-
-    authOverlay.style.display = "none";
-    authOverlay.setAttribute("aria-hidden", "true");
-  }
-
-  // Bouton caché d'origine
+  // Bouton caché d'origine : ouvre toujours la modale auth (utilisé par le profil)
   if (btnAuthOpen) {
-    btnAuthOpen.addEventListener("click", openAuthModal);
+    btnAuthOpen.addEventListener("click", () => openAuthModal('login'));
   }
 
-  // Bouton engrenage visible
+  // Bouton engrenage visible → Réglages (placeholder)
   if (btnAuthGear) {
     btnAuthGear.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-
-      if (btnAuthOpen) {
-        btnAuthOpen.click();
-      } else {
-        openAuthModal();
-      }
+      showToast('⚙️ Réglages bientôt disponibles');
     });
   }
 

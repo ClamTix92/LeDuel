@@ -34,9 +34,16 @@ function populateProfileModal() {
     const accountInfo = document.getElementById('profile-account-info');
     if (accountInfo) {
         if (currentUser.email) {
+            accountInfo.innerHTML = '';
             accountInfo.textContent = `📧 ${currentUser.email}${currentUser.google_id ? ' · Google' : ''}`;
         } else {
-            accountInfo.innerHTML = `Mode invité — <a href="#" id="profile-link-account" style="color:#e94560;">Créer un compte</a> pour sauvegarder ta progression.`;
+            // Mode invité → bloc d'appel à l'action "Créer un compte"
+            accountInfo.innerHTML = `
+                <div class="profile-guest-cta">
+                    <p class="profile-guest-cta-title">⚡ Tu joues en invité</p>
+                    <p class="profile-guest-cta-text">Crée un compte gratuit pour sauvegarder ta progression, ton élo et ton avatar sur tous tes appareils.</p>
+                    <button type="button" class="profile-guest-cta-btn" id="profile-link-account">Créer un compte</button>
+                </div>`;
             document.getElementById('profile-link-account')?.addEventListener('click', (e) => {
                 e.preventDefault();
                 closeProfileModal();
